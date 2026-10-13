@@ -1,0 +1,35 @@
+# ── Build artifacts ───────────────────────────────────────────────────────────
+build/
+.agent-out/
+.outbox/
+__pycache__/
+*.pyc
+*.o
+*.a
+*.so
+
+# ── CMake generated ───────────────────────────────────────────────────────────
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# ── Auto-generated placeholder ────────────────────────────────────────────────
+core/src/_placeholder.cpp
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Local project docs (not for repo) ────────────────────────────────────────
+CONVENTIONS.md
