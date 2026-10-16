@@ -8,6 +8,7 @@ The REST API is described by OpenAPI at `/v3/api-docs` and the interactive Swagg
 - JSON success responses use `{ "success": true, "code": 200, "message": "Success", "data": ... }`. Error responses use the same envelope with `success: false`, `errorCode`, and a safe message. Validation errors also include an `errors` object.
 - `POST /api/auth/login` and token refresh return an access token in the JSON data and set the refresh token in the `HttpOnly` `chess_refresh` cookie. Send cookies with credentials enabled. Refresh and logout use that cookie; logout revokes it and returns `204`.
 - JSON endpoints that return `204`, avatar bytes, or PGN text are not wrapped in `AppResponse`.
+- DTO fields marked `@Sensitive` are omitted unless the authenticated user owns that DTO. In particular, public profiles and search results do not expose the owner-only user ID; use usernames for public profile and challenge actions.
 - Pagination uses zero-based `page` and `size`; maximum size is 50. Search requires at least two characters.
 
 ## Endpoints
