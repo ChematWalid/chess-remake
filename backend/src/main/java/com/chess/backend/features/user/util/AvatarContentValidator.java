@@ -4,6 +4,7 @@ import com.chess.backend.features.user.exception.AvatarContentMismatchException;
 import com.chess.backend.features.user.exception.AvatarReadException;
 import com.chess.backend.features.user.exception.AvatarUploadEmptyException;
 import com.chess.backend.features.user.exception.AvatarUploadTooLargeException;
+import com.chess.backend.features.user.exception.AvatarUploadMissingException;
 import com.chess.backend.features.user.exception.UnsupportedAvatarMediaTypeException;
 import java.io.IOException;
 import java.util.Locale;
@@ -16,6 +17,9 @@ public class AvatarContentValidator {
     private static final Set<String> ALLOWED_TYPES = Set.of("image/png", "image/jpeg", "image/webp");
 
     public ValidatedAvatar validate(MultipartFile file, long maximumSize) {
+        if (file == null) {
+            throw new AvatarUploadMissingException("Avatar file is required");
+        }
         if (file.isEmpty()) {
             throw new AvatarUploadEmptyException("Avatar file is empty");
         }

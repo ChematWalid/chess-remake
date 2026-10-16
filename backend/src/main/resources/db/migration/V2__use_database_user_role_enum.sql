@@ -1,0 +1,6 @@
+CREATE TYPE user_role AS ENUM ('ROLE_USER', 'ROLE_ONBOARDING', 'ROLE_ADMIN');
+
+ALTER TABLE users
+    ALTER COLUMN role DROP DEFAULT,
+    ALTER COLUMN role TYPE user_role USING role::user_role,
+    ALTER COLUMN role SET DEFAULT 'ROLE_USER'::user_role;

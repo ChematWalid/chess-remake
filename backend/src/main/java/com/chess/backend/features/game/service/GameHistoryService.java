@@ -20,9 +20,9 @@ import com.chess.backend.common.config.AppProperties;
 import com.chess.backend.features.challenge.domain.GameChallenge;
 import com.chess.backend.features.game.domain.GameHistory;
 import com.chess.backend.features.user.domain.User;
-import com.chess.backend.features.game.dto.GameHistoryDtos.GameDetail;
-import com.chess.backend.features.game.dto.GameHistoryDtos.GameSummary;
-import com.chess.backend.features.game.dto.GameHistoryDtos.PageResponse;
+import com.chess.backend.features.game.dto.GameDetail;
+import com.chess.backend.features.game.dto.GameSummary;
+import com.chess.backend.features.game.dto.GameHistoryPage;
 import com.chess.backend.features.game.domain.enums.GameResult;
 import com.chess.backend.features.challenge.domain.enums.GameSide;
 import com.chess.backend.features.game.domain.enums.TerminationReason;
@@ -32,13 +32,11 @@ import com.chess.backend.features.user.service.UserDirectory;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +53,7 @@ public class GameHistoryService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<GameSummary> history(long userId, int page, int size) {
+    public GameHistoryPage<GameSummary> history(long userId, int page, int size) {
         Pageable pageable = pageable(page, size);
         Page<GameHistory> results = histories.findByWhitePlayer_IdOrBlackPlayer_IdOrderByPlayedAtDesc(
                 userId, userId, pageable);
@@ -63,7 +61,7 @@ public class GameHistoryService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<GameSummary> playerHistory(long userId, int page, int size) {
+    public GameHistoryPage<GameSummary> playerHistory(long userId, int page, int size) {
         if (!users.existsById(userId)) {
             throw new UserNotFoundException("User not found");
         }
@@ -105,7 +103,7 @@ public class GameHistoryService {
         TerminationReason reason = normalizeReason(request.reasonCode() == null ? request.terminationReason() : request.reasonCode());
         histories.save(new GameHistory(challenge, request.roomCode(), white, black, white.getUsername(), black.getUsername(),
                 winner, request.isDraw(), reason, challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),
-                request.totalMoves(), request.pgn(), request.moves(), request.fens(), Instant.now(clock), request.durationSeconds()));
+                request.totalMoves(), request.pgn(), request.moves(), request.fens(), clock.instant(), request.durationSeconds()));
         if (request.isDraw()) { white.recordResult(GameResult.DRAW); black.recordResult(GameResult.DRAW); }
         else if (winner.getId().equals(white.getId())) { white.recordResult(GameResult.WIN); black.recordResult(GameResult.LOSS); }
         else { black.recordResult(GameResult.WIN); white.recordResult(GameResult.LOSS); }
@@ -125,9 +123,9 @@ public class GameHistoryService {
         return PageRequest.of(page, size);
     }
 
-    private static PageResponse<GameSummary> toPageResponse(Page<GameHistory> result) {
+    private static GameHistoryPage<GameSummary> toPageResponse(Page<GameHistory> result) {
         List<GameSummary> items = result.getContent().stream().map(GameHistoryService::toSummary).toList();
-        return new PageResponse<>(items, result.getNumber(), result.getSize(), result.getTotalElements());
+        return new GameHistoryPage<>(items, result.getNumber(), result.getSize(), result.getTotalElements());
     }
 
     private static GameSummary toSummary(GameHistory game) {

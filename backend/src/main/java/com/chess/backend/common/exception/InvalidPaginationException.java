@@ -1,6 +1,5 @@
 package com.chess.backend.common.exception;
 
-import com.chess.backend.common.exception.AppException;
 import org.springframework.http.HttpStatus;
 
 public final class InvalidPaginationException extends AppException {

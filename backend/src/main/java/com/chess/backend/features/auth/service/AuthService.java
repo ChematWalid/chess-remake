@@ -13,9 +13,10 @@ import com.chess.backend.features.auth.exception.OAuthOnboardingAlreadyCompleteE
 import com.chess.backend.features.auth.exception.RefreshTokenInvalidException;
 
 
-import com.chess.backend.features.auth.dto.AuthDtos.AuthResponse;
-import com.chess.backend.features.auth.dto.AuthDtos.RegisterRequest;
-import com.chess.backend.features.auth.dto.AuthDtos.UserSummary;
+import com.chess.backend.features.auth.dto.AuthResponse;
+import com.chess.backend.features.auth.dto.RegisterRequest;
+import com.chess.backend.features.auth.dto.AuthBundle;
+import com.chess.backend.features.auth.dto.UserSummary;
 import com.chess.backend.common.config.AppProperties;
 import com.chess.backend.features.auth.domain.EmailActionToken;
 import com.chess.backend.features.auth.domain.OAuthExchangeCode;
@@ -30,9 +31,7 @@ import com.chess.backend.features.auth.security.JwtService;
 import com.chess.backend.common.util.TokenUtils;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Locale;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -188,5 +187,4 @@ public class AuthService {
         return token;
     }
 
-    public record AuthBundle(AuthResponse response, String refreshToken) { }
 }

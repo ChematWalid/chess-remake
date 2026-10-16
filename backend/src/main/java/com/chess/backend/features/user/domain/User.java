@@ -10,6 +10,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import com.chess.backend.common.domain.enums.UserRole;
 import com.chess.backend.features.game.domain.enums.GameResult;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 import java.time.Instant;
 
 @Entity
@@ -24,7 +26,10 @@ public class User {
     @Column(name = "avatar_key") private String avatarKey;
     @Column(name = "email_verified", nullable = false) private boolean emailVerified;
     @Column(nullable = false) private boolean searchable = true;
-    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private UserRole role = UserRole.ROLE_USER;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(nullable = false, columnDefinition = "user_role")
+    private UserRole role = UserRole.ROLE_USER;
     @Column(name = "onboarding_complete", nullable = false) private boolean onboardingComplete = true;
     @Column(name = "total_games", nullable = false) private int totalGames;
     @Column(nullable = false) private int wins;

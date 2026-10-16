@@ -4,6 +4,7 @@ import com.chess.backend.common.api.AppResponse;
 import com.chess.backend.common.exception.AppException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,6 +18,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,6 +43,10 @@ public class ApiExceptionHandler {
         Map<String, String> errors = new LinkedHashMap<>();
         exception.getBindingResult().getFieldErrors().forEach(field -> errors.putIfAbsent(field.getField(), field.getDefaultMessage()));
         return ResponseEntity.badRequest().body(AppResponse.validation(HttpStatus.BAD_REQUEST.value(), errors));
+    }
+    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class})
+    ResponseEntity<AppResponse<Void>> handleMethodValidation(Exception exception) {
+        return error(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "One or more request values are invalid");
     }
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<AppResponse<Void>> handleTypeMismatch() {

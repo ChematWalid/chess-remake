@@ -12,8 +12,8 @@ import com.chess.backend.features.challenge.exception.SelfChallengeException;
 import com.chess.backend.features.challenge.util.RoomCodeGenerator;
 
 
-import com.chess.backend.features.challenge.dto.ChallengeDtos.ChallengeEvent;
-import com.chess.backend.features.challenge.dto.ChallengeDtos.SendRequest;
+import com.chess.backend.features.challenge.dto.ChallengeEvent;
+import com.chess.backend.features.challenge.dto.SendChallengeRequest;
 import com.chess.backend.common.config.AppProperties;
 import com.chess.backend.features.challenge.domain.GameChallenge;
 import com.chess.backend.features.user.domain.User;
@@ -23,9 +23,9 @@ import com.chess.backend.features.challenge.repository.GameChallengeRepository;
 import com.chess.backend.features.user.service.UserDirectory;
 import com.chess.backend.features.auth.security.JwtService;
 import com.chess.backend.features.social.service.FriendService;
+import com.chess.backend.features.social.service.PresenceService;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -36,6 +36,7 @@ public class ChallengeService {
     private final GameChallengeRepository challenges;
     private final UserDirectory users;
     private final FriendService friends;
+    private final PresenceService presence;
     private final JwtService jwtService;
     private final SimpMessagingTemplate messaging;
     private final AppProperties properties;
@@ -43,15 +44,17 @@ public class ChallengeService {
     private final RoomCodeGenerator roomCodeGenerator;
 
     public ChallengeService(GameChallengeRepository challenges, UserDirectory users, FriendService friends,
+                           PresenceService presence,
                            JwtService jwtService, SimpMessagingTemplate messaging, AppProperties properties, Clock clock,
                            RoomCodeGenerator roomCodeGenerator) {
-        this.challenges = challenges; this.users = users; this.friends = friends; this.jwtService = jwtService;
+        this.challenges = challenges; this.users = users; this.friends = friends; this.presence = presence;
+        this.jwtService = jwtService;
         this.messaging = messaging; this.properties = properties; this.clock = clock;
         this.roomCodeGenerator = roomCodeGenerator;
     }
 
     @Transactional
-    public void send(long challengerId, SendRequest request) {
+    public void send(long challengerId, SendChallengeRequest request) {
         User challenger = requireUser(challengerId);
         User challenged = users.findByUsername(request.toUsername()).filter(User::isEmailVerified)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -60,7 +63,7 @@ public class ChallengeService {
         if ((request.initialTimeSeconds() == null) != (request.incrementSeconds() == null)) throw new InvalidTimeControlException("Both clock fields are required for a timed game");
         if (request.initialTimeSeconds() != null && (request.initialTimeSeconds() > 2592000 || request.incrementSeconds() > 3600))
             throw new InvalidTimeControlException("Time control is outside supported bounds");
-        Instant now = Instant.now(clock);
+        Instant now = clock.instant();
         if (challenges.hasPendingBetween(challengerId, challenged.getId(), now, ChallengeStatus.PENDING))
             throw new ChallengeAlreadyPendingException("A challenge is already pending");
         GameSide side = request.challengerSide() == null ? GameSide.RANDOM : request.challengerSide();
@@ -68,7 +71,7 @@ public class ChallengeService {
                 request.incrementSeconds(), side, now.plus(properties.invitationTtl())));
         messaging.convertAndSendToUser(challenged.getId().toString(), "/queue/challenges",
                 new ChallengeEvent(challenge.getId(), ChallengeStatus.PENDING, challengerId, challenger.getUsername(), challenger.getDisplayName(),
-                        request.initialTimeSeconds(), request.incrementSeconds(), side.name(), null, null, null, null, null));
+                        request.initialTimeSeconds(), request.incrementSeconds(), side, null, null, null, null, null));
     }
 
     @Transactional
@@ -76,7 +79,7 @@ public class ChallengeService {
         GameChallenge challenge = challenges.lockById(challengeId)
                 .filter(c -> c.getChallenged().getId() == userId && c.getStatus() == ChallengeStatus.PENDING)
                 .orElseThrow(() -> new ChallengeNotFoundException("Pending challenge not found"));
-        if (challenge.getExpiresAt().isBefore(Instant.now(clock))) {
+        if (challenge.getExpiresAt().isBefore(clock.instant())) {
             challenge.setStatus(ChallengeStatus.EXPIRED);
             notifyStatus(challenge, userId, ChallengeStatus.EXPIRED);
             return;
@@ -84,14 +87,16 @@ public class ChallengeService {
         if (!friends.areFriendsAndNotBlocked(challenge.getChallenger().getId(), challenge.getChallenged().getId()))
             throw new ChallengeUnavailableException("Challenge is unavailable");
         String roomCode = roomCodeGenerator.generate();
-        boolean challengerWhite = switch (challenge.getChallengerSide()) {
-            case WHITE -> true;
-            case BLACK -> false;
-            case RANDOM -> roomCodeGenerator.randomBoolean();
+        GameSide challengerColor = switch (challenge.getChallengerSide()) {
+            case WHITE -> GameSide.WHITE;
+            case BLACK -> GameSide.BLACK;
+            case RANDOM -> roomCodeGenerator.randomBoolean() ? GameSide.WHITE : GameSide.BLACK;
         };
-        challenge.accept(roomCode, challengerWhite ? GameSide.WHITE : GameSide.BLACK);
-        sendMatch(challenge, challenge.getChallenger(), roomCode, challengerWhite ? "white" : "black");
-        sendMatch(challenge, challenge.getChallenged(), roomCode, challengerWhite ? "black" : "white");
+        GameSide challengedColor = challengerColor == GameSide.WHITE ? GameSide.BLACK : GameSide.WHITE;
+        challenge.accept(roomCode, challengerColor);
+        presence.gameStarted(challenge.getChallenger().getId(), challenge.getChallenged().getId());
+        sendMatch(challenge, challenge.getChallenger(), roomCode, challengerColor);
+        sendMatch(challenge, challenge.getChallenged(), roomCode, challengedColor);
     }
 
     @Transactional
@@ -107,6 +112,7 @@ public class ChallengeService {
     @Transactional
     public void complete(GameChallenge challenge) {
         challenge.setStatus(ChallengeStatus.COMPLETED);
+        presence.gameCompleted(challenge.getChallenger().getId(), challenge.getChallenged().getId());
     }
 
     @Transactional
@@ -122,7 +128,7 @@ public class ChallengeService {
     @Scheduled(fixedDelay = 30000)
     @Transactional
     public void expirePending() {
-        challenges.expirePending(Instant.now(clock), ChallengeStatus.PENDING, ChallengeStatus.EXPIRED);
+        challenges.expirePending(clock.instant(), ChallengeStatus.PENDING, ChallengeStatus.EXPIRED);
     }
 
     private void changePending(long id, long actor, boolean challengerOnly, ChallengeStatus status) {
@@ -141,13 +147,13 @@ public class ChallengeService {
         messaging.convertAndSendToUser(challenge.getChallenger().getId().toString(), "/queue/challenges", event);
         messaging.convertAndSendToUser(challenge.getChallenged().getId().toString(), "/queue/challenges", event);
     }
-    private void sendMatch(GameChallenge challenge, User recipient, String roomCode, String color) {
+    private void sendMatch(GameChallenge challenge, User recipient, String roomCode, GameSide color) {
         String token = jwtService.createRoomToken(roomCode, recipient.getId(), recipient.getDisplayName(), color,
                 challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds());
         String url = properties.engineWsUrl() + "?room=" + roomCode + "&token=" + token;
         messaging.convertAndSendToUser(recipient.getId().toString(), "/queue/challenges", new ChallengeEvent(challenge.getId(),
                 ChallengeStatus.ACCEPTED, challenge.getChallenger().getId(), null, null, challenge.getInitialTimeSeconds(),
-                challenge.getIncrementSeconds(), challenge.getChallengerSide().name(), roomCode, color.toUpperCase(Locale.ROOT), url, token, null));
+                challenge.getIncrementSeconds(), challenge.getChallengerSide(), roomCode, color, url, token, null));
     }
     private User requireUser(long id) { return users.findById(id).filter(User::isEmailVerified).orElseThrow(() -> new UserNotFoundException("User not found")); }
 }

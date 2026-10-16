@@ -1,6 +1,8 @@
 package com.chess.backend.features.auth.service;
 
 import com.chess.backend.features.auth.domain.OAuthIdentity;
+import com.chess.backend.features.auth.dto.OAuthVerifiedIdentity;
+import com.chess.backend.features.auth.util.GithubEmailListType;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.auth.repository.OAuthIdentityRepository;
 import com.chess.backend.features.user.service.UserDirectory;
@@ -8,14 +10,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
+import java.util.Objects;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
@@ -36,19 +37,33 @@ public class OAuthAccountService {
 
     @Transactional
     public String authenticate(OAuth2AuthenticationToken authentication) {
-        String provider = authentication.getAuthorizedClientRegistrationId().toLowerCase(Locale.ROOT);
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw oauthFailure("OAuth provider identity is missing");
+        }
+        String registrationId = authentication.getAuthorizedClientRegistrationId();
+        if (registrationId == null || registrationId.isBlank()) {
+            throw oauthFailure("OAuth provider is missing");
+        }
+        String provider = registrationId.toLowerCase(Locale.ROOT);
         OAuth2User principal = authentication.getPrincipal();
         String subject = subject(provider, principal);
-        VerifiedIdentity verified = provider.equals("github") ? githubIdentity(authentication, principal) : googleIdentity(principal);
+        OAuthVerifiedIdentity verified = switch (provider) {
+            case "github" -> githubIdentity(authentication, principal);
+            case "google" -> googleIdentity(principal);
+            default -> throw oauthFailure("OAuth provider is not supported");
+        };
+        String normalizedEmail = verified.email().trim().toLowerCase(Locale.ROOT);
+        OAuthVerifiedIdentity normalizedIdentity = new OAuthVerifiedIdentity(normalizedEmail, verified.displayName());
         User user = identities.findByProviderAndProviderSubject(provider, subject).map(OAuthIdentity::getUser).orElseGet(() -> {
-            User byEmail = users.findByEmail(verified.email()).orElse(null);
+            User byEmail = users.findByEmail(normalizedIdentity.email()).orElse(null);
             if (byEmail != null) {
                 if (!byEmail.isEmailVerified()) throw oauthFailure("Email must be verified before linking this account");
                 identities.save(new OAuthIdentity(byEmail, provider, subject));
                 return byEmail;
             }
-            User created = new User(temporaryUsername(), verified.email(), null,
-                    verified.displayName() == null || verified.displayName().isBlank() ? "Chess Player" : verified.displayName());
+            User created = new User(temporaryUsername(), normalizedIdentity.email(), null,
+                    normalizedIdentity.displayName() == null || normalizedIdentity.displayName().isBlank()
+                            ? "Chess Player" : normalizedIdentity.displayName().trim());
             created.setEmailVerified(true);
             created.requireOAuthOnboarding();
             User saved = users.create(created);
@@ -58,26 +73,38 @@ public class OAuthAccountService {
         return authService.createOAuthExchangeCode(user);
     }
 
-    private VerifiedIdentity googleIdentity(OAuth2User principal) {
+    private OAuthVerifiedIdentity googleIdentity(OAuth2User principal) {
         String email = principal.getAttribute("email");
         Boolean verified = principal.getAttribute("email_verified");
-        if (email == null || !Boolean.TRUE.equals(verified)) throw oauthFailure("A verified provider email is required");
-        return new VerifiedIdentity(email, principal.getAttribute("name"));
+        if (email == null || email.isBlank() || !Boolean.TRUE.equals(verified)) {
+            throw oauthFailure("A verified provider email is required");
+        }
+        return new OAuthVerifiedIdentity(email, principal.getAttribute("name"));
     }
 
-    private VerifiedIdentity githubIdentity(OAuth2AuthenticationToken authentication, OAuth2User principal) {
-        OAuth2AuthorizedClient client = authorizedClients.loadAuthorizedClient(authentication.getAuthorizedClientRegistrationId(), authentication.getName());
-        if (client == null) throw oauthFailure("OAuth authorization could not be verified");
+    private OAuthVerifiedIdentity githubIdentity(OAuth2AuthenticationToken authentication, OAuth2User principal) {
+        String principalName = authentication.getName();
+        if (principalName == null || principalName.isBlank()) {
+            throw oauthFailure("OAuth principal name is missing");
+        }
+        OAuth2AuthorizedClient client = authorizedClients.loadAuthorizedClient(
+                authentication.getAuthorizedClientRegistrationId(), principalName);
+        if (client == null || client.getAccessToken() == null
+                || client.getAccessToken().getTokenValue() == null) {
+            throw oauthFailure("OAuth authorization could not be verified");
+        }
         List<Map<String, Object>> emails = restClient.get().uri("https://api.github.com/user/emails")
                 .headers(headers -> headers.setBearerAuth(client.getAccessToken().getTokenValue()))
                 .header("Accept", "application/vnd.github+json")
-                .retrieve().body(new ParameterizedTypeReference<>() { });
+                .retrieve().body(new GithubEmailListType());
         if (emails == null) throw oauthFailure("A verified provider email is required");
-        String email = emails.stream().filter(item -> Boolean.TRUE.equals(item.get("primary")) && Boolean.TRUE.equals(item.get("verified")))
+        String email = emails.stream().filter(Objects::nonNull)
+                .filter(item -> Boolean.TRUE.equals(item.get("primary")) && Boolean.TRUE.equals(item.get("verified")))
                 .map(item -> item.get("email")).filter(String.class::isInstance).map(String.class::cast).findFirst()
                 .orElseThrow(() -> oauthFailure("A verified provider email is required"));
+        if (email.isBlank()) throw oauthFailure("A verified provider email is required");
         String displayName = principal.getAttribute("name");
-        return new VerifiedIdentity(email, displayName == null ? principal.getAttribute("login") : displayName);
+        return new OAuthVerifiedIdentity(email, displayName == null ? principal.getAttribute("login") : displayName);
     }
 
     private static String subject(String provider, OAuth2User principal) {
@@ -96,5 +123,4 @@ public class OAuthAccountService {
     private static OAuth2AuthenticationException oauthFailure(String message) {
         return new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info"), message);
     }
-    private record VerifiedIdentity(String email, String displayName) { }
 }

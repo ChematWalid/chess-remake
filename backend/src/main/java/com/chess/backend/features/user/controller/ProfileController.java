@@ -2,15 +2,17 @@ package com.chess.backend.features.user.controller;
 
 
 import com.chess.backend.features.user.service.ProfileService;
-import com.chess.backend.features.user.dto.ProfileDtos;
-import com.chess.backend.features.user.dto.ProfileDtos.UpdateRequest;
+import com.chess.backend.features.user.dto.SearchResult;
+import com.chess.backend.features.user.dto.ProfilePage;
+import com.chess.backend.features.user.dto.Profile;
+import com.chess.backend.features.user.dto.ProfileUpdateRequest;
 import com.chess.backend.common.security.ChessPrincipal;
 import com.chess.backend.features.user.storage.StoredFile;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Duration;
 import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,8 +25,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
+@Validated
 @RequestMapping("/api/users")
 public class ProfileController {
 
@@ -35,12 +39,13 @@ public class ProfileController {
     }
 
     @GetMapping("/me")
-    ProfileDtos.Profile me(@AuthenticationPrincipal ChessPrincipal principal) {
+    Profile me(@AuthenticationPrincipal ChessPrincipal principal) {
         return service.me(principal.userId());
     }
 
     @PutMapping("/me")
-    ProfileDtos.Profile update(@AuthenticationPrincipal ChessPrincipal principal, @Valid @RequestBody UpdateRequest request) {
+    Profile update(@AuthenticationPrincipal ChessPrincipal principal,
+                   @NotNull @Valid @RequestBody ProfileUpdateRequest request) {
         return service.update(principal.userId(), request);
     }
 
@@ -53,20 +58,24 @@ public class ProfileController {
     @GetMapping("/{id}/avatar")
     ResponseEntity<byte[]> getAvatar(@PathVariable long id) throws IOException {
         try (StoredFile file = service.avatar(id)) {
-            return ResponseEntity.ok().contentType(MediaType.parseMediaType(file.contentType()))
-                    .contentLength(file.size()).cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
-                    .header("X-Content-Type-Options", "nosniff")
-                    .body(file.input().readAllBytes());
+            ResponseEntity.BodyBuilder response = ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(file.contentType()))
+                    .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
+                    .header("X-Content-Type-Options", "nosniff");
+            if (file.size() >= 0) {
+                response.contentLength(file.size());
+            }
+            return response.body(file.input().readAllBytes());
         }
     }
 
     @GetMapping("/{username}/profile")
-    ProfileDtos.Profile publicProfile(@PathVariable String username) {
+    Profile publicProfile(@PathVariable String username) {
         return service.publicProfile(username);
     }
 
     @GetMapping("/search")
-    ProfileDtos.Page<ProfileDtos.SearchResult> search(@AuthenticationPrincipal ChessPrincipal principal,
+    ProfilePage<SearchResult> search(@AuthenticationPrincipal ChessPrincipal principal,
                                                        @RequestParam String q,
                                                        @RequestParam(defaultValue = "0") int page,
                                                        @RequestParam(defaultValue = "10") int size) {

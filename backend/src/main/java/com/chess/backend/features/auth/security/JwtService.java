@@ -4,6 +4,7 @@ package com.chess.backend.features.auth.security;
 import com.chess.backend.common.security.ChessPrincipal;
 import com.chess.backend.common.config.AppProperties;
 import com.chess.backend.common.domain.enums.UserRole;
+import com.chess.backend.features.challenge.domain.enums.GameSide;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -50,14 +51,14 @@ public class JwtService {
                 UserRole.valueOf(claims.get("roles", List.class).getFirst().toString()));
     }
 
-    public String createRoomToken(String roomCode, long userId, String displayName, String color,
+    public String createRoomToken(String roomCode, long userId, String displayName, GameSide color,
                                   Integer initialSeconds, Integer incrementSeconds) {
         Instant now = clock.instant();
         Map<String, Object> claims = new HashMap<>();
         claims.put("room_code", roomCode);
         claims.put("user_id", Long.toString(userId));
         claims.put("display_name", displayName);
-        claims.put("color", color.toLowerCase(Locale.ROOT));
+        claims.put("color", color.name().toLowerCase(Locale.ROOT));
         claims.put("initial_seconds", initialSeconds == null ? 0 : initialSeconds);
         claims.put("increment_seconds", incrementSeconds == null ? 0 : incrementSeconds);
         return Jwts.builder().claims(claims).id(UUID.randomUUID().toString())

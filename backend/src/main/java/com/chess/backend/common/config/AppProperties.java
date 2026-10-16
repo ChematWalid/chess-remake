@@ -16,7 +16,6 @@ public record AppProperties(
         Duration refreshTokenTtl,
         Duration roomTokenTtl,
         Duration invitationTtl,
-        Duration roomJoinWindow,
         boolean cookieSecure,
         String cookieSameSite,
         String emailFrom,
@@ -27,8 +26,7 @@ public record AppProperties(
         String s3AccessKey,
         String s3SecretKey,
         boolean s3PathStyle,
-        DataSize avatarMaxSize,
-        String logLevel) {
+        DataSize avatarMaxSize) {
 
     public AppProperties {
         if (frontendUrl == null || frontendUrl.isBlank()) {
@@ -43,10 +41,37 @@ public record AppProperties(
         if (internalToken == null || internalToken.length() < 32) {
             throw new IllegalStateException("app.internal-token must contain at least 32 characters");
         }
+        requireText(engineWsUrl, "app.engine-ws-url");
+        requireText(corsOrigins, "app.cors-origins");
+        requireText(cookieSameSite, "app.cookie-same-site");
+        requireText(emailFrom, "app.email-from");
+        requireText(storageProvider, "app.storage-provider");
+        requireText(s3Endpoint, "app.s3-endpoint");
+        requireText(s3Region, "app.s3-region");
+        requireText(s3Bucket, "app.s3-bucket");
+        requireText(s3AccessKey, "app.s3-access-key");
+        requireText(s3SecretKey, "app.s3-secret-key");
+        if (!cookieSameSite.equalsIgnoreCase("Strict") && !cookieSameSite.equalsIgnoreCase("Lax")
+                && !cookieSameSite.equalsIgnoreCase("None")) {
+            throw new IllegalStateException("app.cookie-same-site must be Strict, Lax, or None");
+        }
+        if (cookieSameSite.equalsIgnoreCase("None") && !cookieSecure) {
+            throw new IllegalStateException("Secure cookies are required when app.cookie-same-site is None");
+        }
         if (accessTokenTtl == null || accessTokenTtl.isNegative() || accessTokenTtl.isZero()
                 || refreshTokenTtl == null || refreshTokenTtl.isNegative() || refreshTokenTtl.isZero()
-                || roomTokenTtl == null || roomTokenTtl.isNegative() || roomTokenTtl.isZero()) {
+                || roomTokenTtl == null || roomTokenTtl.isNegative() || roomTokenTtl.isZero()
+                || invitationTtl == null || invitationTtl.isNegative() || invitationTtl.isZero()) {
             throw new IllegalStateException("Token lifetimes must be positive");
+        }
+        if (avatarMaxSize == null || avatarMaxSize.toBytes() <= 0) {
+            throw new IllegalStateException("app.avatar-max-size must be positive");
+        }
+    }
+
+    private static void requireText(String value, String propertyName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(propertyName + " is required");
         }
     }
 }

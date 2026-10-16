@@ -2,12 +2,16 @@ package com.chess.backend.features.social.controller;
 
 
 import com.chess.backend.features.social.service.FriendService;
+import com.chess.backend.features.social.dto.CreateInviteResponse;
+import com.chess.backend.features.social.dto.FriendRequestSummary;
+import com.chess.backend.features.social.dto.FriendRequestView;
+import com.chess.backend.features.social.dto.FriendView;
+import com.chess.backend.features.social.dto.RedeemInviteRequest;
 import com.chess.backend.features.social.service.PresenceService;
 import com.chess.backend.common.security.ChessPrincipal;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
-import java.time.Instant;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,8 +21,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
+@Validated
 @RequestMapping("/api/friends")
 public class FriendController {
 
@@ -32,17 +38,17 @@ public class FriendController {
 
     @GetMapping
     List<FriendView> friends(@AuthenticationPrincipal ChessPrincipal principal) {
-        return service.friends(principal.userId()).stream().map(friend -> new FriendView(friend.id(), friend.username(),
-                friend.displayName(), "/api/users/" + friend.id() + "/avatar", presence.status(friend.id()))).toList();
+        return service.friends(principal.userId()).stream().map(friend -> new FriendView(friend.id(), friend.username(), friend.displayName(),
+                "/api/users/" + friend.id() + "/avatar", presence.status(friend.id()))).toList();
     }
 
     @GetMapping("/requests/incoming")
-    List<RequestView> incoming(@AuthenticationPrincipal ChessPrincipal principal) {
+    List<FriendRequestView> incoming(@AuthenticationPrincipal ChessPrincipal principal) {
         return service.incoming(principal.userId()).stream().map(FriendController::mapRequest).toList();
     }
 
     @GetMapping("/requests/outgoing")
-    List<RequestView> outgoing(@AuthenticationPrincipal ChessPrincipal principal) {
+    List<FriendRequestView> outgoing(@AuthenticationPrincipal ChessPrincipal principal) {
         return service.outgoing(principal.userId()).stream().map(FriendController::mapRequest).toList();
     }
 
@@ -83,24 +89,19 @@ public class FriendController {
     }
 
     @PostMapping("/invite")
-    InviteResponse createInvite(@AuthenticationPrincipal ChessPrincipal principal) {
-        return new InviteResponse("/friend-invite/" + service.createInvite(principal.userId()));
+    CreateInviteResponse createInvite(@AuthenticationPrincipal ChessPrincipal principal) {
+        return new CreateInviteResponse("/friend-invite/" + service.createInvite(principal.userId()));
     }
 
     @PostMapping("/invite/redeem")
-    ResponseEntity<Void> redeem(@AuthenticationPrincipal ChessPrincipal principal, @Valid @RequestBody RedeemRequest request) {
+    ResponseEntity<Void> redeem(@AuthenticationPrincipal ChessPrincipal principal,
+                                @NotNull @Valid @RequestBody RedeemInviteRequest request) {
         service.redeemInvite(principal.userId(), request.token());
         return ResponseEntity.noContent().build();
     }
 
-    public record InviteResponse(String path) { }
-    public record RedeemRequest(@NotBlank String token) { }
-    public record FriendView(long id, String username, String displayName, String avatarUrl, String presence) { }
-    public record RequestView(long requestId, long userId, String username, String displayName, String avatarUrl,
-                              Instant createdAt) { }
-
-    private static RequestView mapRequest(FriendService.RequestView request) {
-        return new RequestView(request.requestId(), request.userId(), request.username(), request.displayName(),
+    private static FriendRequestView mapRequest(FriendRequestSummary request) {
+        return new FriendRequestView(request.requestId(), request.userId(), request.username(), request.displayName(),
                 "/api/users/" + request.userId() + "/avatar", request.createdAt());
     }
 }

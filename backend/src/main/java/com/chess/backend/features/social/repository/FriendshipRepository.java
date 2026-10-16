@@ -6,19 +6,20 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
-    @Query(value = "SELECT * FROM friendships WHERE LEAST(requester_id, addressee_id) = LEAST(:first, :second) "
-            + "AND GREATEST(requester_id, addressee_id) = GREATEST(:first, :second)", nativeQuery = true)
+    @Query("select friendship from Friendship friendship where "
+            + "(friendship.requester.id = :first and friendship.addressee.id = :second) or "
+            + "(friendship.requester.id = :second and friendship.addressee.id = :first)")
     Optional<Friendship> findPair(@Param("first") long firstId, @Param("second") long secondId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query(value = "SELECT * FROM friendships WHERE LEAST(requester_id, addressee_id) = LEAST(:first, :second) "
-            + "AND GREATEST(requester_id, addressee_id) = GREATEST(:first, :second) FOR UPDATE", nativeQuery = true)
+    @Query("select friendship from Friendship friendship where "
+            + "(friendship.requester.id = :first and friendship.addressee.id = :second) or "
+            + "(friendship.requester.id = :second and friendship.addressee.id = :first)")
     Optional<Friendship> lockPair(@Param("first") long firstId, @Param("second") long secondId);
 
     @Query("select f from Friendship f join fetch f.requester join fetch f.addressee "

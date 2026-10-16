@@ -1,10 +1,12 @@
 package com.chess.backend.features.user.storage;
 
 import com.chess.backend.common.config.AppProperties;
+import com.chess.backend.features.user.exception.AvatarNotFoundException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.UUID;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -19,8 +21,8 @@ import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 @Service
 public class S3FileStorage implements FileStorage {
@@ -67,8 +69,17 @@ public class S3FileStorage implements FileStorage {
         throw new IllegalStateException("Could not initialize object storage", lastFailure);
     }
 
+    @PreDestroy
+    void closeClient() {
+        client.close();
+    }
+
     @Override
     public String store(String category, InputStream input, long size, String contentType) {
+        if (category == null || category.isBlank() || input == null || size < 0
+                || contentType == null || contentType.isBlank()) {
+            throw new IllegalArgumentException("File category, content, size, and media type are required");
+        }
         String key = category + "/" + UUID.randomUUID();
         client.putObject(PutObjectRequest.builder().bucket(properties.s3Bucket()).key(key).contentType(contentType).build(),
                 RequestBody.fromInputStream(input, size));
@@ -77,9 +88,18 @@ public class S3FileStorage implements FileStorage {
 
     @Override
     public StoredFile retrieve(String key) {
-        ResponseInputStream<GetObjectResponse> response = client.getObject(
-                GetObjectRequest.builder().bucket(properties.s3Bucket()).key(key).build());
-        return new StoredFile(response, response.response().contentType(), response.response().contentLength());
+        if (key == null || key.isBlank()) {
+            throw new AvatarNotFoundException("Avatar not found");
+        }
+        try {
+            ResponseInputStream<GetObjectResponse> response = client.getObject(
+                    GetObjectRequest.builder().bucket(properties.s3Bucket()).key(key).build());
+            String contentType = response.response().contentType();
+            Long size = response.response().contentLength();
+            return new StoredFile(response, contentType, size == null ? -1L : size);
+        } catch (NoSuchKeyException exception) {
+            throw new AvatarNotFoundException("Avatar not found");
+        }
     }
 
     @Override

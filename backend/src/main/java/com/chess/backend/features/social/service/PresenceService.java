@@ -1,5 +1,8 @@
 package com.chess.backend.features.social.service;
 
+import com.chess.backend.features.social.dto.PresenceEvent;
+import com.chess.backend.features.social.domain.enums.PresenceStatus;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.event.EventListener;
@@ -13,6 +16,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 public class PresenceService {
 
     private final ConcurrentHashMap<Long, Set<String>> sessions = new ConcurrentHashMap<>();
+    private final Set<Long> inGame = ConcurrentHashMap.newKeySet();
     private final FriendService friendService;
     private final SimpMessagingTemplate messaging;
 
@@ -23,37 +27,92 @@ public class PresenceService {
 
     @EventListener
     public void connected(SessionConnectedEvent event) {
-        if (event.getUser() == null) return;
-        long userId = parseUserId(event.getUser().getName());
+        if (event == null || event.getUser() == null) {
+            return;
+        }
+        Long userId = parseUserId(event.getUser().getName());
+        if (userId == null) {
+            return;
+        }
         String sessionId = StompHeaderAccessor.wrap(event.getMessage()).getSessionId();
-        boolean first = sessions.computeIfAbsent(userId, ignored -> ConcurrentHashMap.newKeySet()).add(sessionId);
-        if (first) broadcast(userId, "ONLINE");
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        AtomicBoolean becameOnline = new AtomicBoolean();
+        sessions.compute(userId, (ignored, userSessions) -> {
+            Set<String> updatedSessions = userSessions == null ? ConcurrentHashMap.newKeySet() : userSessions;
+            if (updatedSessions.add(sessionId) && updatedSessions.size() == 1) {
+                becameOnline.set(true);
+            }
+            return updatedSessions;
+        });
+        if (becameOnline.get()) {
+            broadcast(userId, status(userId));
+        }
     }
 
     @EventListener
     public void disconnected(SessionDisconnectEvent event) {
-        if (event.getUser() == null) return;
-        long userId = parseUserId(event.getUser().getName());
-        Set<String> userSessions = sessions.get(userId);
-        if (userSessions != null && userSessions.remove(event.getSessionId()) && userSessions.isEmpty()) {
-            sessions.remove(userId, userSessions);
-            broadcast(userId, "OFFLINE");
+        if (event == null || event.getUser() == null || event.getSessionId() == null) {
+            return;
+        }
+        Long userId = parseUserId(event.getUser().getName());
+        if (userId == null) {
+            return;
+        }
+        AtomicBoolean becameOffline = new AtomicBoolean();
+        sessions.computeIfPresent(userId, (ignored, userSessions) -> {
+            userSessions.remove(event.getSessionId());
+            if (userSessions.isEmpty()) {
+                becameOffline.set(true);
+                return null;
+            }
+            return userSessions;
+        });
+        if (becameOffline.get()) {
+            broadcast(userId, status(userId));
         }
     }
 
-    public String status(long userId) {
-        return sessions.containsKey(userId) ? "ONLINE" : "OFFLINE";
+    public PresenceStatus status(long userId) {
+        if (inGame.contains(userId)) {
+            return PresenceStatus.IN_GAME;
+        }
+        return sessions.containsKey(userId) ? PresenceStatus.ONLINE : PresenceStatus.OFFLINE;
     }
 
-    private void broadcast(long userId, String status) {
+    public void gameStarted(long firstPlayerId, long secondPlayerId) {
+        updateGameStatus(firstPlayerId, true);
+        updateGameStatus(secondPlayerId, true);
+    }
+
+    public void gameCompleted(long firstPlayerId, long secondPlayerId) {
+        updateGameStatus(firstPlayerId, false);
+        updateGameStatus(secondPlayerId, false);
+    }
+
+    private void updateGameStatus(long userId, boolean playing) {
+        boolean changed = playing ? inGame.add(userId) : inGame.remove(userId);
+        if (changed) {
+            broadcast(userId, status(userId));
+        }
+    }
+
+    private void broadcast(long userId, PresenceStatus status) {
         PresenceEvent event = new PresenceEvent(userId, status);
         friendService.friendIds(userId).forEach(friendId ->
                 messaging.convertAndSendToUser(Long.toString(friendId), "/queue/presence", event));
     }
 
-    private static long parseUserId(String value) {
-        return Long.parseLong(value);
+    private static Long parseUserId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
-    public record PresenceEvent(long userId, String status) { }
 }

@@ -1,6 +1,10 @@
 package com.chess.backend.features.social.service;
 
 import com.chess.backend.features.social.exception.FriendRequestNotFoundException;
+import com.chess.backend.features.social.dto.FriendSummary;
+import com.chess.backend.features.social.dto.FriendRequestSummary;
+import com.chess.backend.features.social.dto.FriendNotification;
+import com.chess.backend.features.social.domain.enums.NotificationType;
 
 
 import com.chess.backend.common.exception.UserNotFoundException;
@@ -25,12 +29,9 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
-import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,19 +51,19 @@ public class FriendService {
     }
 
     @Transactional(readOnly = true)
-    public List<FriendView> friends(long userId) {
+    public List<FriendSummary> friends(long userId) {
         return friendships.findForUser(userId, FriendshipStatus.ACCEPTED).stream().map(f -> {
             User other = f.getRequester().getId() == userId ? f.getAddressee() : f.getRequester();
-            return new FriendView(other.getId(), other.getUsername(), other.getDisplayName(), "OFFLINE");
+            return new FriendSummary(other.getId(), other.getUsername(), other.getDisplayName());
         }).toList();
     }
     @Transactional(readOnly = true)
-    public List<RequestView> incoming(long userId) {
+    public List<FriendRequestSummary> incoming(long userId) {
         return mapRequests(friendships.incoming(userId, FriendshipStatus.PENDING), true);
     }
 
     @Transactional(readOnly = true)
-    public List<RequestView> outgoing(long userId) {
+    public List<FriendRequestSummary> outgoing(long userId) {
         return mapRequests(friendships.outgoing(userId, FriendshipStatus.PENDING), false);
     }
 
@@ -85,7 +86,8 @@ public class FriendService {
             }
             relation.setStatus(FriendshipStatus.PENDING);
         } else friendships.save(new Friendship(requester, target, FriendshipStatus.PENDING));
-        messaging.convertAndSendToUser(target.getId().toString(), "/queue/notifications", new Notification("FRIEND_REQUEST", requester.getId().toString()));
+        messaging.convertAndSendToUser(target.getId().toString(), "/queue/notifications",
+                new FriendNotification(NotificationType.FRIEND_REQUEST, requester.getId().toString()));
     }
 
     @Transactional
@@ -144,7 +146,7 @@ public class FriendService {
         ensureDifferent(visitorId, owner.getId());
         Friendship relation = friendships.lockPair(visitorId, owner.getId()).orElse(null);
         if (relation != null && relation.getStatus() == FriendshipStatus.BLOCKED) throw unavailable();
-        invite.consume(visitor, Instant.now(clock));
+        invite.consume(visitor, clock.instant());
         if (relation == null) friendships.save(new Friendship(owner, visitor, FriendshipStatus.ACCEPTED));
         else relation.setStatus(FriendshipStatus.ACCEPTED);
     }
@@ -164,10 +166,10 @@ public class FriendService {
                 .orElseThrow(() -> new FriendRequestNotFoundException("Incoming request not found"));
         friendship.setStatus(status);
     }
-    private List<RequestView> mapRequests(List<Friendship> rows, boolean incoming) {
+    private List<FriendRequestSummary> mapRequests(List<Friendship> rows, boolean incoming) {
         return rows.stream().map(f -> {
             User other = incoming ? f.getRequester() : f.getAddressee();
-            return new RequestView(f.getId(), other.getId(), other.getUsername(), other.getDisplayName(), f.getCreatedAt());
+            return new FriendRequestSummary(f.getId(), other.getId(), other.getUsername(), other.getDisplayName(), f.getCreatedAt());
         }).toList();
     }
     private User requireUser(long id) { return users.findById(id).orElseThrow(() -> new UserNotFoundException("User not found")); }
@@ -177,7 +179,4 @@ public class FriendService {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); }
     }
-    public record FriendView(long id, String username, String displayName, String presence) { }
-    public record RequestView(long requestId, long userId, String username, String displayName, Instant createdAt) { }
-    public record Notification(String type, String subjectId) { }
-}
+    }
