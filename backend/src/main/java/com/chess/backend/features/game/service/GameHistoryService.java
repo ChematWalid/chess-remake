@@ -25,6 +25,8 @@ import com.chess.backend.features.game.dto.GameSummary;
 import com.chess.backend.features.game.dto.GameHistoryPage;
 import com.chess.backend.features.game.domain.enums.GameResult;
 import com.chess.backend.features.challenge.domain.enums.GameSide;
+import com.chess.backend.features.challenge.domain.enums.ChallengeStatus;
+import com.chess.backend.features.challenge.exception.GameRoomInactiveException;
 import com.chess.backend.features.game.domain.enums.TerminationReason;
 import com.chess.backend.features.challenge.service.ChallengeService;
 import com.chess.backend.features.game.repository.GameHistoryRepository;
@@ -85,10 +87,11 @@ public class GameHistoryService {
     @Transactional
     public boolean record(String secret, GameRecordRequest request) {
         if (!constantTimeEquals(properties.internalToken(), secret)) throw new InvalidEngineCredentialsException("Invalid engine credentials");
+        GameChallenge challenge = challenges.lockRoom(request.roomCode());
         if (histories.findByRoomCode(request.roomCode()).isPresent()) return false;
-        GameChallenge challenge = challenges.lockAcceptedRoom(request.roomCode());
-        if (!request.roomCode().equals(request.roomToken()))
-            throw new GameRoomMismatchException("Game room token or state is invalid");
+        if (challenge.getStatus() != ChallengeStatus.ACCEPTED) {
+            throw new GameRoomInactiveException("Game room is not active");
+        }
         User white = challenge.getChallengerColor() == GameSide.WHITE ? challenge.getChallenger() : challenge.getChallenged();
         User black = white.getId().equals(challenge.getChallenger().getId()) ? challenge.getChallenged() : challenge.getChallenger();
         if (!white.getId().toString().equals(request.whitePlayerId()) || !black.getId().toString().equals(request.blackPlayerId()))
@@ -99,7 +102,6 @@ public class GameHistoryService {
         if (winner != null && !winner.getId().equals(white.getId()) && !winner.getId().equals(black.getId()))
             throw new InvalidWinnerException("Winner is not a player in this game");
         if (request.isDraw() != (winner == null)) throw new InvalidGameResultException("Winner and draw result disagree");
-        if (histories.findByRoomCode(request.roomCode()).isPresent()) return false;
         TerminationReason reason = normalizeReason(request.reasonCode() == null ? request.terminationReason() : request.reasonCode());
         histories.save(new GameHistory(challenge, request.roomCode(), white, black, white.getUsername(), black.getUsername(),
                 winner, request.isDraw(), reason, challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),

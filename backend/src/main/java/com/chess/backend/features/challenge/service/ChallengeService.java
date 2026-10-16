@@ -5,7 +5,6 @@ import com.chess.backend.features.challenge.exception.ChallengeAlreadyPendingExc
 import com.chess.backend.features.challenge.exception.ChallengeNotFoundException;
 import com.chess.backend.features.challenge.exception.ChallengeRequiresFriendException;
 import com.chess.backend.features.challenge.exception.ChallengeUnavailableException;
-import com.chess.backend.features.challenge.exception.GameRoomInactiveException;
 import com.chess.backend.features.challenge.exception.GameRoomNotFoundException;
 import com.chess.backend.features.challenge.exception.InvalidTimeControlException;
 import com.chess.backend.features.challenge.exception.SelfChallengeException;
@@ -100,13 +99,9 @@ public class ChallengeService {
     }
 
     @Transactional
-    public GameChallenge lockAcceptedRoom(String roomCode) {
-        GameChallenge challenge = challenges.lockByRoomCode(roomCode)
+    public GameChallenge lockRoom(String roomCode) {
+        return challenges.lockByRoomCode(roomCode)
                 .orElseThrow(() -> new GameRoomNotFoundException("Game room not found"));
-        if (challenge.getStatus() != ChallengeStatus.ACCEPTED) {
-            throw new GameRoomInactiveException("Game room is not active");
-        }
-        return challenge;
     }
 
     @Transactional

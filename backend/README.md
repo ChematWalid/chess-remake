@@ -36,6 +36,8 @@ Set the database, storage, mail, and required token secrets in the environment f
 - `/api/games/*`: paginated history, full replay payload, and PGN download.
 - `POST /api/internal/games/record`: C++ game server webhook, authenticated with `X-Internal-Token`.
 
-The game-history webhook validates the room token, room assignment, players, winner/draw consistency, and replay array lengths before saving history and updating player counters in one transaction.
+REST endpoint details and DTO schemas are published at `/v3/api-docs` (interactive UI at `/swagger-ui.html`). STOMP event payloads, cookie behavior, and C++ WebSocket/webhook configuration are documented in [API_CONTRACT.md](API_CONTRACT.md).
+
+The game-history webhook authenticates the C++ server with `X-Internal-Token`, locks the accepted room, and validates its room assignment, players, winner/draw consistency, and replay array lengths before saving history and updating player counters in one transaction. The C++ server currently sends a redundant `roomToken` field equal to `roomCode`; the backend ignores that legacy field. Repeated webhook delivery for a completed room is idempotent.
 
 All JSON REST success bodies follow `{ "success": true, "code": 200, "message": "Success", "data": ... }`. Errors use the same envelope with `success: false`, `errorCode`, and a safe message. Sensitive DTO properties marked `@Sensitive` are only serialized when the authenticated principal matches the DTO's `ownerId`.

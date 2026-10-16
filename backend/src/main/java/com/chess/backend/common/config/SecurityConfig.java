@@ -36,7 +36,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/oauth/onboarding").hasAuthority(UserRole.ROLE_ONBOARDING.name())
-                        .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**", "/ws/**", "/actuator/health/**")
+                        .requestMatchers("/api/auth/**", "/oauth2/**", "/login/oauth2/**", "/ws/**", "/actuator/health/**",
+                                "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
                         .permitAll()
                         .requestMatchers("/api/internal/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users/*/avatar").permitAll()

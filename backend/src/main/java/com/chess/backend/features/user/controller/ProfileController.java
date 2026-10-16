@@ -49,7 +49,7 @@ public class ProfileController {
         return service.update(principal.userId(), request);
     }
 
-    @PostMapping("/me/avatar")
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<?> avatar(@AuthenticationPrincipal ChessPrincipal principal, @RequestParam("file") MultipartFile file) {
         service.uploadAvatar(principal.userId(), file);
         return ResponseEntity.noContent().build();
