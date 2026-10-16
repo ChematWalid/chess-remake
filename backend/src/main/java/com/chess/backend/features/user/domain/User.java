@@ -13,11 +13,14 @@ import com.chess.backend.features.game.domain.enums.GameResult;
 import org.hibernate.annotations.JdbcType;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
 public class User {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    private UUID publicId = UUID.randomUUID();
     @Column(nullable = false, unique = true, length = 30) private String username;
     @Column(nullable = false, length = 254) private String email;
     @Column(name = "password_hash", length = 100) private String passwordHash;
@@ -43,6 +46,7 @@ public class User {
         this.username = username; this.email = email; this.passwordHash = passwordHash; this.displayName = displayName;
     }
     public Long getId() { return id; }
+    public UUID getPublicId() { return publicId; }
     public String getUsername() { return username; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }

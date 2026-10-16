@@ -164,7 +164,7 @@ public class AuthService {
                 clock.instant().plus(properties.refreshTokenTtl())));
         String accessToken = jwtService.createAccessToken(user.getId(), user.getUsername(), user.getRole());
         AuthResponse response = new AuthResponse(accessToken, "Bearer", properties.accessTokenTtl().toSeconds(), !user.isOnboardingComplete(),
-                new UserSummary(user.getId(), user.getUsername(), user.getDisplayName(), user.getEmail()));
+                new UserSummary(user.getPublicId(), user.getUsername(), user.getDisplayName(), user.getEmail()));
         return new AuthBundle(response, rawToken);
     }
 

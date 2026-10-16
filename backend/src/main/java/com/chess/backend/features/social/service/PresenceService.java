@@ -2,11 +2,13 @@ package com.chess.backend.features.social.service;
 
 import com.chess.backend.features.social.dto.PresenceEvent;
 import com.chess.backend.features.social.domain.enums.PresenceStatus;
+import com.chess.backend.features.user.domain.User;
+import com.chess.backend.features.user.service.UserDirectory;
+import com.chess.backend.common.service.UserMessagePublisher;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -18,11 +20,13 @@ public class PresenceService {
     private final ConcurrentHashMap<Long, Set<String>> sessions = new ConcurrentHashMap<>();
     private final Set<Long> inGame = ConcurrentHashMap.newKeySet();
     private final FriendService friendService;
-    private final SimpMessagingTemplate messaging;
+    private final UserDirectory users;
+    private final UserMessagePublisher messages;
 
-    public PresenceService(FriendService friendService, SimpMessagingTemplate messaging) {
+    public PresenceService(FriendService friendService, UserDirectory users, UserMessagePublisher messages) {
         this.friendService = friendService;
-        this.messaging = messaging;
+        this.users = users;
+        this.messages = messages;
     }
 
     @EventListener
@@ -99,9 +103,11 @@ public class PresenceService {
     }
 
     private void broadcast(long userId, PresenceStatus status) {
-        PresenceEvent event = new PresenceEvent(userId, status);
-        friendService.friendIds(userId).forEach(friendId ->
-                messaging.convertAndSendToUser(Long.toString(friendId), "/queue/presence", event));
+        users.findById(userId).map(User::getPublicId).ifPresent(publicUserId -> {
+            PresenceEvent event = new PresenceEvent(publicUserId, status);
+            friendService.friendIds(userId).forEach(friendId ->
+                    messages.publish(friendId, "/queue/presence", event));
+        });
     }
 
     private static Long parseUserId(String value) {

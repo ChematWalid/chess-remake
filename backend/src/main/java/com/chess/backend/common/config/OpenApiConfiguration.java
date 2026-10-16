@@ -89,7 +89,7 @@ public class OpenApiConfiguration {
         return path.equals("/api/auth/register") || path.equals("/api/auth/login")
                 || path.equals("/api/auth/verify-email") || path.equals("/api/auth/forgot-password")
                 || path.equals("/api/auth/reset-password") || path.equals("/api/auth/oauth/exchange")
-                || path.equals("/api/users/{id}/avatar");
+                || path.equals("/api/users/{publicId}/avatar");
     }
 
     private static void wrapJsonResponse(Operation operation) {
@@ -151,10 +151,10 @@ public class OpenApiConfiguration {
         if ((method == PathItem.HttpMethod.POST && (path.equals("/api/auth/logout")
                 || path.equals("/api/auth/reset-password")
                 || path.equals("/api/friends/accept/{requestId}") || path.equals("/api/friends/decline/{requestId}")
-                || path.equals("/api/friends/block/{userId}") || path.equals("/api/friends/invite/redeem")
+                || path.equals("/api/friends/block/{publicUserId}") || path.equals("/api/friends/invite/redeem")
                 || path.equals("/api/users/me/avatar")))
                 || (method == PathItem.HttpMethod.DELETE
-                && (path.equals("/api/friends/{friendId}") || path.equals("/api/friends/block/{userId}")))) {
+                && (path.equals("/api/friends/{publicUserId}") || path.equals("/api/friends/block/{publicUserId}")))) {
             return "204";
         }
         return null;

@@ -23,6 +23,7 @@ import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.game.dto.GameDetail;
 import com.chess.backend.features.game.dto.GameSummary;
 import com.chess.backend.features.game.dto.GameHistoryPage;
+import com.chess.backend.features.game.event.GameRecordedEvent;
 import com.chess.backend.features.game.domain.enums.GameResult;
 import com.chess.backend.features.challenge.domain.enums.GameSide;
 import com.chess.backend.features.challenge.domain.enums.ChallengeStatus;
@@ -36,10 +37,12 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -49,9 +52,11 @@ public class GameHistoryService {
     private final UserDirectory users;
     private final AppProperties properties;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
     public GameHistoryService(GameHistoryRepository histories, ChallengeService challenges, UserDirectory users,
-                              AppProperties properties, Clock clock) {
-        this.histories = histories; this.challenges = challenges; this.users = users; this.properties = properties; this.clock = clock;
+                              AppProperties properties, Clock clock, ApplicationEventPublisher eventPublisher) {
+        this.histories = histories; this.challenges = challenges; this.users = users; this.properties = properties;
+        this.clock = clock; this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -68,6 +73,13 @@ public class GameHistoryService {
             throw new UserNotFoundException("User not found");
         }
         return history(userId, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public GameHistoryPage<GameSummary> playerHistory(UUID publicUserId, int page, int size) {
+        User user = users.findByPublicId(publicUserId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        return history(user.getId(), page, size);
     }
 
     @Transactional(readOnly = true)
@@ -103,13 +115,14 @@ public class GameHistoryService {
             throw new InvalidWinnerException("Winner is not a player in this game");
         if (request.isDraw() != (winner == null)) throw new InvalidGameResultException("Winner and draw result disagree");
         TerminationReason reason = normalizeReason(request.reasonCode() == null ? request.terminationReason() : request.reasonCode());
-        histories.save(new GameHistory(challenge, request.roomCode(), white, black, white.getUsername(), black.getUsername(),
+        GameHistory saved = histories.save(new GameHistory(challenge, request.roomCode(), white, black, white.getUsername(), black.getUsername(),
                 winner, request.isDraw(), reason, challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),
                 request.totalMoves(), request.pgn(), request.moves(), request.fens(), clock.instant(), request.durationSeconds()));
         if (request.isDraw()) { white.recordResult(GameResult.DRAW); black.recordResult(GameResult.DRAW); }
         else if (winner.getId().equals(white.getId())) { white.recordResult(GameResult.WIN); black.recordResult(GameResult.LOSS); }
         else { black.recordResult(GameResult.WIN); white.recordResult(GameResult.LOSS); }
         challenges.complete(challenge);
+        eventPublisher.publishEvent(new GameRecordedEvent(saved.getId(), white.getId(), black.getId()));
         return true;
     }
 
@@ -135,8 +148,8 @@ public class GameHistoryService {
                 ? game.getWhiteUsernameSnapshot() : game.getWhitePlayer().getUsername();
         String blackUsername = game.getBlackPlayer() == null
                 ? game.getBlackUsernameSnapshot() : game.getBlackPlayer().getUsername();
-        Long winnerId = game.getWinner() == null ? null : game.getWinner().getId();
-        return new GameSummary(game.getId(), whiteUsername, blackUsername, game.isDraw(), winnerId,
+        UUID winnerPublicUserId = game.getWinner() == null ? null : game.getWinner().getPublicId();
+        return new GameSummary(game.getId(), whiteUsername, blackUsername, game.isDraw(), winnerPublicUserId,
                 game.getTerminationReason().name(), game.getTotalMoves(), game.getPlayedAt());
     }
 

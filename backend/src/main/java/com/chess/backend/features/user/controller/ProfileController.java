@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -55,9 +56,9 @@ public class ProfileController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/{id}/avatar")
-    ResponseEntity<byte[]> getAvatar(@PathVariable long id) throws IOException {
-        try (StoredFile file = service.avatar(id)) {
+    @GetMapping("/{publicId}/avatar")
+    ResponseEntity<byte[]> getAvatar(@PathVariable UUID publicId) throws IOException {
+        try (StoredFile file = service.avatar(publicId)) {
             ResponseEntity.BodyBuilder response = ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(file.contentType()))
                     .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())

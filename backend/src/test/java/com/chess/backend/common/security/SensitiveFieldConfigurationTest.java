@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.UUID;
 
 class SensitiveFieldConfigurationTest {
     private final ObjectMapper objectMapper = new ObjectMapper()
@@ -41,6 +42,8 @@ class SensitiveFieldConfigurationTest {
 
         assertFalse(anonymousJson.contains("\"id\":42"));
         assertFalse(otherUserJson.contains("\"id\":42"));
+        assertTrue(anonymousJson.contains("\"publicId\":"));
+        assertTrue(otherUserJson.contains("\"publicId\":"));
     }
 
     private UsernamePasswordAuthenticationToken authenticationFor(long userId) {
@@ -49,6 +52,6 @@ class SensitiveFieldConfigurationTest {
     }
 
     private Profile profileOwnedBy(long userId) {
-        return new Profile(userId, "player", "Player", null, null, true, 0, 0, 0, 0, userId);
+        return new Profile(userId, UUID.randomUUID(), "player", "Player", null, null, true, 0, 0, 0, 0, userId);
     }
 }

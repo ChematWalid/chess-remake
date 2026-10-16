@@ -4,6 +4,7 @@ import com.chess.backend.features.social.domain.Friendship;
 import com.chess.backend.features.social.domain.enums.FriendshipStatus;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -31,8 +32,9 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     List<Friendship> incoming(@Param("user") long userId, @Param("status") FriendshipStatus status);
 
     @Query("select f from Friendship f join fetch f.requester join fetch f.addressee "
-            + "where f.requester.id = :user and f.status = :status order by f.createdAt desc")
-    List<Friendship> outgoing(@Param("user") long userId, @Param("status") FriendshipStatus status);
+            + "where f.requester.id = :user and f.status in :statuses order by f.createdAt desc")
+    List<Friendship> outgoingHistory(@Param("user") long userId,
+                                     @Param("statuses") Collection<FriendshipStatus> statuses);
 
     @Query("select count(f) > 0 from Friendship f where f.status = :status "
             + "and ((f.requester.id = :first and f.addressee.id = :second) or (f.requester.id = :second and f.addressee.id = :first))")

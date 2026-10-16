@@ -20,6 +20,7 @@ import com.chess.backend.features.user.storage.StoredFile;
 import com.chess.backend.features.user.util.AvatarContentValidator;
 import com.chess.backend.features.user.util.ValidatedAvatar;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,7 +73,7 @@ public class ProfileService {
         if (page < 0 || size < 1 || size > 50) throw new InvalidPaginationException("Invalid page or page size");
         String needle = query.trim().toLowerCase(java.util.Locale.ROOT);
         var results = users.search(viewerId, needle + "%", "%" + needle + "%", PageRequest.of(page, size));
-        List<SearchResult> items = results.getContent().stream().map(user -> new SearchResult(user.getId(), user.getUsername(),
+        List<SearchResult> items = results.getContent().stream().map(user -> new SearchResult(user.getId(), user.getPublicId(), user.getUsername(),
                 user.getDisplayName(), avatarUrl(user), user.getTotalGames(), user.getWins(), user.getLosses(), user.getDraws(), user.getId())).toList();
         return new ProfilePage<>(items, page, size, results.getTotalElements());
     }
@@ -89,14 +90,14 @@ public class ProfileService {
     }
 
     @Transactional(readOnly = true)
-    public StoredFile avatar(long userId) {
-        String key = requireUser(userId).getAvatarKey();
+    public StoredFile avatar(UUID publicId) {
+        String key = users.findByPublicId(publicId).orElseThrow(() -> new UserNotFoundException("User not found")).getAvatarKey();
         if (key == null) throw new AvatarNotFoundException("Avatar not found");
         return storage.retrieve(key);
     }
 
     private User requireUser(long id) { return users.findById(id).orElseThrow(() -> new UserNotFoundException("User not found")); }
-    private Profile toProfile(User user) { return new Profile(user.getId(), user.getUsername(), user.getDisplayName(), user.getBio(), avatarUrl(user),
+    private Profile toProfile(User user) { return new Profile(user.getId(), user.getPublicId(), user.getUsername(), user.getDisplayName(), user.getBio(), avatarUrl(user),
             user.isSearchable(), user.getTotalGames(), user.getWins(), user.getLosses(), user.getDraws(), user.getId()); }
-    private String avatarUrl(User user) { return user.getAvatarKey() == null ? null : "/api/users/" + user.getId() + "/avatar"; }
+    private String avatarUrl(User user) { return user.getAvatarKey() == null ? null : "/api/users/" + user.getPublicId() + "/avatar"; }
 }

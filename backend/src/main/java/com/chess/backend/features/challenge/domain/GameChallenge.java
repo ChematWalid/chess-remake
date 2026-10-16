@@ -30,6 +30,7 @@ public class GameChallenge {
     @Column(name = "room_code", unique = true, length = 10) private String roomCode;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private ChallengeStatus status;
     @Column(name = "expires_at", nullable = false) private Instant expiresAt;
+    @Column(name = "created_at", insertable = false, updatable = false) private Instant createdAt;
     protected GameChallenge() { }
     public GameChallenge(User challenger, User challenged, Integer initialTimeSeconds, Integer incrementSeconds,
                          GameSide challengerSide, Instant expiresAt) {
@@ -47,6 +48,7 @@ public class GameChallenge {
     public String getRoomCode() { return roomCode; }
     public ChallengeStatus getStatus() { return status; }
     public Instant getExpiresAt() { return expiresAt; }
+    public Instant getCreatedAt() { return createdAt; }
     public void accept(String roomCode, GameSide challengerColor) { this.roomCode = roomCode; this.challengerColor = challengerColor; this.status = ChallengeStatus.ACCEPTED; }
     public void setStatus(ChallengeStatus status) { this.status = status; }
 }

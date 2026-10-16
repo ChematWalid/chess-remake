@@ -12,6 +12,7 @@ import com.chess.backend.common.security.ChessPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,8 +39,8 @@ public class FriendController {
 
     @GetMapping
     List<FriendView> friends(@AuthenticationPrincipal ChessPrincipal principal) {
-        return service.friends(principal.userId()).stream().map(friend -> new FriendView(friend.id(), friend.username(), friend.displayName(),
-                "/api/users/" + friend.id() + "/avatar", presence.status(friend.id()))).toList();
+        return service.friends(principal.userId()).stream().map(friend -> new FriendView(friend.publicUserId(), friend.username(), friend.displayName(),
+                "/api/users/" + friend.publicUserId() + "/avatar", presence.status(friend.userId()))).toList();
     }
 
     @GetMapping("/requests/incoming")
@@ -70,21 +71,21 @@ public class FriendController {
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/{friendId}")
-    ResponseEntity<Void> remove(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable long friendId) {
-        service.remove(principal.userId(), friendId);
+    @DeleteMapping("/{publicUserId}")
+    ResponseEntity<Void> remove(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable UUID publicUserId) {
+        service.remove(principal.userId(), publicUserId);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/block/{userId}")
-    ResponseEntity<Void> block(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable long userId) {
-        service.block(principal.userId(), userId);
+    @PostMapping("/block/{publicUserId}")
+    ResponseEntity<Void> block(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable UUID publicUserId) {
+        service.block(principal.userId(), publicUserId);
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/block/{userId}")
-    ResponseEntity<Void> unblock(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable long userId) {
-        service.unblock(principal.userId(), userId);
+    @DeleteMapping("/block/{publicUserId}")
+    ResponseEntity<Void> unblock(@AuthenticationPrincipal ChessPrincipal principal, @PathVariable UUID publicUserId) {
+        service.unblock(principal.userId(), publicUserId);
         return ResponseEntity.noContent().build();
     }
 
@@ -101,7 +102,7 @@ public class FriendController {
     }
 
     private static FriendRequestView mapRequest(FriendRequestSummary request) {
-        return new FriendRequestView(request.requestId(), request.userId(), request.username(), request.displayName(),
-                "/api/users/" + request.userId() + "/avatar", request.createdAt());
+        return new FriendRequestView(request.requestId(), request.publicUserId(), request.username(), request.displayName(),
+                request.status(), "/api/users/" + request.publicUserId() + "/avatar", request.createdAt());
     }
 }

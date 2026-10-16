@@ -3,11 +3,12 @@ package com.chess.backend.features.social.service;
 import com.chess.backend.features.social.exception.FriendRequestNotFoundException;
 import com.chess.backend.features.social.dto.FriendSummary;
 import com.chess.backend.features.social.dto.FriendRequestSummary;
-import com.chess.backend.features.social.dto.FriendNotification;
+import com.chess.backend.features.social.dto.UserNotification;
 import com.chess.backend.features.social.domain.enums.NotificationType;
 
 
 import com.chess.backend.common.exception.UserNotFoundException;
+import com.chess.backend.common.service.UserMessagePublisher;
 import com.chess.backend.features.social.exception.AlreadyFriendsException;
 import com.chess.backend.features.social.exception.FriendInviteInvalidException;
 import com.chess.backend.features.social.exception.FriendRequestAlreadyPendingException;
@@ -32,7 +33,7 @@ import java.time.Clock;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,19 +43,19 @@ public class FriendService {
     private final UserDirectory users;
     private final FriendshipRepository friendships;
     private final FriendInviteRepository invites;
-    private final SimpMessagingTemplate messaging;
+    private final UserMessagePublisher messages;
     private final Clock clock;
 
     public FriendService(UserDirectory users, FriendshipRepository friendships, FriendInviteRepository invites,
-                         SimpMessagingTemplate messaging, Clock clock) {
-        this.users = users; this.friendships = friendships; this.invites = invites; this.messaging = messaging; this.clock = clock;
+                         UserMessagePublisher messages, Clock clock) {
+        this.users = users; this.friendships = friendships; this.invites = invites; this.messages = messages; this.clock = clock;
     }
 
     @Transactional(readOnly = true)
     public List<FriendSummary> friends(long userId) {
         return friendships.findForUser(userId, FriendshipStatus.ACCEPTED).stream().map(f -> {
             User other = f.getRequester().getId() == userId ? f.getAddressee() : f.getRequester();
-            return new FriendSummary(other.getId(), other.getUsername(), other.getDisplayName());
+            return new FriendSummary(other.getPublicId(), other.getId(), other.getUsername(), other.getDisplayName());
         }).toList();
     }
     @Transactional(readOnly = true)
@@ -64,7 +65,7 @@ public class FriendService {
 
     @Transactional(readOnly = true)
     public List<FriendRequestSummary> outgoing(long userId) {
-        return mapRequests(friendships.outgoing(userId, FriendshipStatus.PENDING), false);
+        return mapRequests(friendships.outgoingHistory(userId, List.of(FriendshipStatus.PENDING, FriendshipStatus.DECLINED)), false);
     }
 
     @Transactional
@@ -80,14 +81,16 @@ public class FriendService {
             if (relation.getStatus() == FriendshipStatus.PENDING) {
                 if (relation.getRequester().getId().equals(target.getId())) {
                     relation.setStatus(FriendshipStatus.ACCEPTED);
+                    notifyStatus(relation.getRequester(), NotificationType.FRIEND_REQUEST_ACCEPTED, requester.getPublicId());
+                    notifyStatus(relation.getAddressee(), NotificationType.FRIEND_REQUEST_ACCEPTED, target.getPublicId());
                     return;
                 }
                 throw new FriendRequestAlreadyPendingException("A friend request is already pending");
             }
             relation.setStatus(FriendshipStatus.PENDING);
         } else friendships.save(new Friendship(requester, target, FriendshipStatus.PENDING));
-        messaging.convertAndSendToUser(target.getId().toString(), "/queue/notifications",
-                new FriendNotification(NotificationType.FRIEND_REQUEST, requester.getId().toString()));
+        messages.publish(target.getId(), "/queue/notifications",
+                new UserNotification(NotificationType.FRIEND_REQUEST, requester.getPublicId().toString()));
     }
 
     @Transactional
@@ -108,6 +111,12 @@ public class FriendService {
     }
 
     @Transactional
+    public void remove(long userId, UUID otherPublicId) {
+        User other = users.findByPublicId(otherPublicId).orElseThrow(() -> new UserNotFoundException("User not found"));
+        remove(userId, other.getId());
+    }
+
+    @Transactional
     public void block(long blockerId, long targetId) {
         ensureDifferent(blockerId, targetId);
         User blocker = requireUser(blockerId);
@@ -122,10 +131,22 @@ public class FriendService {
     }
 
     @Transactional
+    public void block(long blockerId, UUID targetPublicId) {
+        User target = users.findByPublicId(targetPublicId).orElseThrow(() -> new UserNotFoundException("User not found"));
+        block(blockerId, target.getId());
+    }
+
+    @Transactional
     public void unblock(long blockerId, long targetId) {
         Friendship relation = friendships.lockPair(blockerId, targetId).filter(f -> f.getStatus() == FriendshipStatus.BLOCKED
                 && f.getRequester().getId().equals(blockerId)).orElse(null);
         if (relation != null) friendships.delete(relation);
+    }
+
+    @Transactional
+    public void unblock(long blockerId, UUID targetPublicId) {
+        User target = users.findByPublicId(targetPublicId).orElseThrow(() -> new UserNotFoundException("User not found"));
+        unblock(blockerId, target.getId());
     }
 
     @Transactional
@@ -165,16 +186,23 @@ public class FriendService {
         Friendship friendship = friendships.findById(requestId).filter(f -> f.getAddressee().getId() == userId && f.getStatus() == FriendshipStatus.PENDING)
                 .orElseThrow(() -> new FriendRequestNotFoundException("Incoming request not found"));
         friendship.setStatus(status);
+        NotificationType notificationType = status == FriendshipStatus.ACCEPTED
+                ? NotificationType.FRIEND_REQUEST_ACCEPTED : NotificationType.FRIEND_REQUEST_DECLINED;
+        notifyStatus(friendship.getRequester(), notificationType, friendship.getAddressee().getPublicId());
     }
     private List<FriendRequestSummary> mapRequests(List<Friendship> rows, boolean incoming) {
         return rows.stream().map(f -> {
             User other = incoming ? f.getRequester() : f.getAddressee();
-            return new FriendRequestSummary(f.getId(), other.getId(), other.getUsername(), other.getDisplayName(), f.getCreatedAt());
+            return new FriendRequestSummary(f.getId(), other.getPublicId(), other.getId(), other.getUsername(),
+                    other.getDisplayName(), f.getStatus(), f.getCreatedAt());
         }).toList();
     }
     private User requireUser(long id) { return users.findById(id).orElseThrow(() -> new UserNotFoundException("User not found")); }
     private static void ensureDifferent(long first, long second) { if (first == second) throw new SelfFriendActionException("You cannot perform this action with yourself"); }
     private static FriendshipUnavailableException unavailable() { return new FriendshipUnavailableException( "This action is unavailable"); }
+    private void notifyStatus(User recipient, NotificationType type, UUID subjectId) {
+        messages.publish(recipient.getId(), "/queue/notifications", new UserNotification(type, subjectId.toString()));
+    }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is unavailable", exception); }

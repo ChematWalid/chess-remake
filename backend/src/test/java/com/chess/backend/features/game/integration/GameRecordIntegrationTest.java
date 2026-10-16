@@ -2,6 +2,7 @@ package com.chess.backend.features.game.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,12 +14,18 @@ import com.chess.backend.features.challenge.domain.GameChallenge;
 import com.chess.backend.features.challenge.domain.enums.ChallengeStatus;
 import com.chess.backend.features.challenge.domain.enums.GameSide;
 import com.chess.backend.features.challenge.repository.GameChallengeRepository;
+import com.chess.backend.features.challenge.service.ChallengeService;
+import com.chess.backend.features.challenge.dto.SendChallengeRequest;
 import com.chess.backend.features.game.repository.GameHistoryRepository;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.repository.UserRepository;
 import com.chess.backend.features.user.service.ProfileService;
 import com.chess.backend.features.user.storage.FileStorage;
+import com.chess.backend.features.user.storage.StoredFile;
+import com.chess.backend.features.auth.security.JwtService;
+import com.chess.backend.common.domain.enums.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -42,7 +50,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.mockito.ArgumentCaptor;
 
 @SpringBootTest(properties = {
         "app.frontend-url=http://localhost:5173",
@@ -93,6 +100,12 @@ class GameRecordIntegrationTest {
     private ProfileService profileService;
 
     @Autowired
+    private ChallengeService challengeService;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @MockBean
@@ -100,6 +113,7 @@ class GameRecordIntegrationTest {
 
     @MockBean
     private JavaMailSender mailSender;
+
 
     @BeforeEach
     void clearDatabase() {
@@ -267,6 +281,90 @@ class GameRecordIntegrationTest {
         assertThat(search.items().stream().map(result -> result.username()).toList())
                 .containsExactly(target.getUsername())
                 .doesNotContain(hidden.getUsername());
+        assertThat(search.items().getFirst().publicId()).isEqualTo(target.getPublicId());
+    }
+
+    @Test
+    void usesOpaqueIdsForProfilesAvatarsBlocksAndOtherPlayerHistory() throws Exception {
+        User viewer = verifiedUser("public-id-viewer");
+        GameChallenge game = acceptedChallenge("PUBID1");
+        User publicProfile = game.getChallenger();
+        publicProfile.setAvatarKey("avatar-key");
+        users.save(publicProfile);
+        when(fileStorage.retrieve("avatar-key")).thenReturn(new StoredFile(
+                new ByteArrayInputStream(new byte[]{1, 2, 3}), "image/png", 3));
+        String token = jwtService.createAccessToken(viewer.getId(), viewer.getUsername(), UserRole.ROLE_USER);
+
+        mockMvc.perform(get("/api/users/{username}/profile", game.getChallenger().getUsername())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.publicId").value(game.getChallenger().getPublicId().toString()))
+                .andExpect(jsonPath("$.data.id").doesNotExist())
+                .andExpect(jsonPath("$.data.avatarUrl").value("/api/users/" + game.getChallenger().getPublicId() + "/avatar"));
+
+        mockMvc.perform(get("/api/users/{publicId}/avatar", game.getChallenger().getPublicId()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("image/png"));
+
+        mockMvc.perform(get("/api/users/search").param("q", game.getChallenger().getUsername())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].publicId").value(game.getChallenger().getPublicId().toString()))
+                .andExpect(jsonPath("$.data.items[0].id").doesNotExist());
+
+        mockMvc.perform(post("/api/friends/block/{publicUserId}", game.getChallenger().getPublicId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        String body = payload(game, "PUBID1", "PUBID1", false, "1");
+        mockMvc.perform(post("/api/internal/games/record").header("X-Internal-Token", INTERNAL_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/games/user/{publicUserId}", game.getChallenger().getPublicId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].winnerPublicUserId")
+                        .value(game.getChallenger().getPublicId().toString()));
+    }
+
+    @Test
+    void recoversChallengeAfterReconnectAndReturnsPlayerSpecificConnectionToken() throws Exception {
+        User challenger = verifiedUser("challenge-out-user");
+        User challenged = verifiedUser("challenge-in-user");
+        friendService.request(challenger.getId(), challenged.getUsername());
+        friendService.accept(challenged.getId(), friendService.incoming(challenged.getId()).getFirst().requestId());
+        String challengerToken = jwtService.createAccessToken(challenger.getId(), challenger.getUsername(), UserRole.ROLE_USER);
+        String challengedToken = jwtService.createAccessToken(challenged.getId(), challenged.getUsername(), UserRole.ROLE_USER);
+
+        challengeService.send(challenger.getId(), new SendChallengeRequest(challenged.getUsername(), GameSide.WHITE, 300, 0));
+
+        mockMvc.perform(get("/api/challenges/outgoing").header("Authorization", "Bearer " + challengerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"));
+        String outgoing = mockMvc.perform(get("/api/challenges/outgoing")
+                        .header("Authorization", "Bearer " + challengerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+        long challengeId = objectMapper.readTree(outgoing).path("data").path("items").get(0).path("challengeId").asLong();
+        assertThat(challengeId).isPositive();
+        challengeService.accept(challenged.getId(), challengeId);
+
+        var white = mockMvc.perform(get("/api/challenges/{challengeId}", challengeId)
+                        .header("Authorization", "Bearer " + challengerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.playerColor").value("WHITE"))
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        var black = mockMvc.perform(get("/api/challenges/{challengeId}", challengeId)
+                        .header("Authorization", "Bearer " + challengedToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.playerColor").value("BLACK"))
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(white).contains(challenged.getPublicId().toString());
+        assertThat(black).contains(challenger.getPublicId().toString());
     }
 
     private int submitTogether(String payload, CountDownLatch ready, CountDownLatch start) throws Exception {

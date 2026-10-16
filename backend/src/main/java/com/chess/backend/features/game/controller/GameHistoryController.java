@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.validation.annotation.Validated;
+import java.util.UUID;
 
 @RestController
 @Validated
@@ -46,10 +47,10 @@ public class GameHistoryController {
         return service.history(principal.userId(), page, size);
     }
 
-    @GetMapping("/games/user/{userId}")
-    GameHistoryPage<GameSummary> player(@PathVariable long userId, @RequestParam(defaultValue = "0") int page,
+    @GetMapping("/games/user/{publicUserId}")
+    GameHistoryPage<GameSummary> player(@PathVariable UUID publicUserId, @RequestParam(defaultValue = "0") int page,
                                      @RequestParam(defaultValue = "10") int size) {
-        return service.playerHistory(userId, page, size);
+        return service.playerHistory(publicUserId, page, size);
     }
 
     @GetMapping("/games/{id}")
