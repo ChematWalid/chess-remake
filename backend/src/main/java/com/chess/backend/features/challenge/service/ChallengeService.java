@@ -1,8 +1,5 @@
 package com.chess.backend.features.challenge.service;
 
-import com.chess.backend.common.exception.NotFoundException;
-
-
 import com.chess.backend.common.exception.UserNotFoundException;
 import com.chess.backend.features.challenge.exception.ChallengeAlreadyPendingException;
 import com.chess.backend.features.challenge.exception.ChallengeNotFoundException;
@@ -12,6 +9,7 @@ import com.chess.backend.features.challenge.exception.GameRoomInactiveException;
 import com.chess.backend.features.challenge.exception.GameRoomNotFoundException;
 import com.chess.backend.features.challenge.exception.InvalidTimeControlException;
 import com.chess.backend.features.challenge.exception.SelfChallengeException;
+import com.chess.backend.features.challenge.util.RoomCodeGenerator;
 
 
 import com.chess.backend.features.challenge.dto.ChallengeDtos.ChallengeEvent;
@@ -25,11 +23,9 @@ import com.chess.backend.features.challenge.repository.GameChallengeRepository;
 import com.chess.backend.features.user.service.UserDirectory;
 import com.chess.backend.features.auth.security.JwtService;
 import com.chess.backend.features.social.service.FriendService;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
-import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -37,8 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChallengeService {
-    private static final String ROOM_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private static final SecureRandom RANDOM = new SecureRandom();
     private final GameChallengeRepository challenges;
     private final UserDirectory users;
     private final FriendService friends;
@@ -46,11 +40,14 @@ public class ChallengeService {
     private final SimpMessagingTemplate messaging;
     private final AppProperties properties;
     private final Clock clock;
+    private final RoomCodeGenerator roomCodeGenerator;
 
     public ChallengeService(GameChallengeRepository challenges, UserDirectory users, FriendService friends,
-                           JwtService jwtService, SimpMessagingTemplate messaging, AppProperties properties, Clock clock) {
+                           JwtService jwtService, SimpMessagingTemplate messaging, AppProperties properties, Clock clock,
+                           RoomCodeGenerator roomCodeGenerator) {
         this.challenges = challenges; this.users = users; this.friends = friends; this.jwtService = jwtService;
         this.messaging = messaging; this.properties = properties; this.clock = clock;
+        this.roomCodeGenerator = roomCodeGenerator;
     }
 
     @Transactional
@@ -86,11 +83,11 @@ public class ChallengeService {
         }
         if (!friends.areFriendsAndNotBlocked(challenge.getChallenger().getId(), challenge.getChallenged().getId()))
             throw new ChallengeUnavailableException("Challenge is unavailable");
-        String roomCode = generateRoomCode();
+        String roomCode = roomCodeGenerator.generate();
         boolean challengerWhite = switch (challenge.getChallengerSide()) {
             case WHITE -> true;
             case BLACK -> false;
-            case RANDOM -> RANDOM.nextBoolean();
+            case RANDOM -> roomCodeGenerator.randomBoolean();
         };
         challenge.accept(roomCode, challengerWhite ? GameSide.WHITE : GameSide.BLACK);
         sendMatch(challenge, challenge.getChallenger(), roomCode, challengerWhite ? "white" : "black");
@@ -151,14 +148,6 @@ public class ChallengeService {
         messaging.convertAndSendToUser(recipient.getId().toString(), "/queue/challenges", new ChallengeEvent(challenge.getId(),
                 ChallengeStatus.ACCEPTED, challenge.getChallenger().getId(), null, null, challenge.getInitialTimeSeconds(),
                 challenge.getIncrementSeconds(), challenge.getChallengerSide().name(), roomCode, color.toUpperCase(Locale.ROOT), url, token, null));
-    }
-    private String generateRoomCode() {
-        for (int attempt = 0; attempt < 10; attempt++) {
-            StringBuilder code = new StringBuilder(6);
-            for (int index = 0; index < 6; index++) code.append(ROOM_CHARACTERS.charAt(RANDOM.nextInt(ROOM_CHARACTERS.length())));
-            if (!challenges.existsByRoomCode(code.toString())) return code.toString();
-        }
-        throw new IllegalStateException("Could not allocate a unique room code");
     }
     private User requireUser(long id) { return users.findById(id).filter(User::isEmailVerified).orElseThrow(() -> new UserNotFoundException("User not found")); }
 }

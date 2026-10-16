@@ -2,6 +2,14 @@
 
 Spring Boot 3 and Java 21 backend for authentication, profiles, searchable users, friends, challenges, presence, avatar storage, and archived chess games. Persistence uses Hibernate/JPA entities and Spring Data repositories; Flyway owns schema changes. REST JSON responses use `AppResponse<T>` and centralized error handling.
 
+## Feature structure
+
+Business code is grouped by feature under `com.chess.backend.features`. Each feature owns its controllers, services, domain model, repositories, DTOs, and any feature-specific configuration, utilities, or exceptions it needs. Cross-feature operations go through the owning feature's service API; a feature should not reach into another feature's repository. Shared response, security, configuration, exception-base, enum, and utility code lives under `com.chess.backend.common`.
+
+Application failures use a dedicated exception type per condition, derived from `AppException`. `ApiExceptionHandler` turns those exceptions and framework request failures into the common error response with an HTTP status, stable error code, and safe message. Infrastructure failures are logged centrally and return a generic internal error.
+
+Live gameplay remains owned by the C++ server. It reports transient player disconnects to the opponent and records a completed abandonment as the `ABANDONED` game termination reason after its reconnect grace period. The backend persists that final result; it does not model a temporary disconnect as a backend exception.
+
 ## Local services
 
 ```sh

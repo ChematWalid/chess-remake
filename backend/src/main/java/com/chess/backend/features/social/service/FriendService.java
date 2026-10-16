@@ -1,6 +1,5 @@
 package com.chess.backend.features.social.service;
 
-import com.chess.backend.common.exception.NotFoundException;
 import com.chess.backend.features.social.exception.FriendRequestNotFoundException;
 
 

@@ -1,6 +1,5 @@
 package com.chess.backend.features.auth.service;
 
-import com.chess.backend.common.exception.NotFoundException;
 import com.chess.backend.features.user.exception.UsernameAlreadyTakenException;
 
 

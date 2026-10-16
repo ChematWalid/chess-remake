@@ -1,6 +1,5 @@
 package com.chess.backend.features.challenge.exception;
 
-import com.chess.backend.common.exception.NotFoundException;
 
 import com.chess.backend.common.exception.AppException;
 import org.springframework.http.HttpStatus;

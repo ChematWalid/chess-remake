@@ -26,11 +26,12 @@ public class OAuthAccountService {
     private final OAuthIdentityRepository identities;
     private final OAuth2AuthorizedClientService authorizedClients;
     private final AuthService authService;
-    private final RestClient restClient = RestClient.create();
+    private final RestClient restClient;
 
     public OAuthAccountService(UserDirectory users, OAuthIdentityRepository identities,
-                               OAuth2AuthorizedClientService authorizedClients, AuthService authService) {
+                               OAuth2AuthorizedClientService authorizedClients, AuthService authService, RestClient restClient) {
         this.users = users; this.identities = identities; this.authorizedClients = authorizedClients; this.authService = authService;
+        this.restClient = restClient;
     }
 
     @Transactional

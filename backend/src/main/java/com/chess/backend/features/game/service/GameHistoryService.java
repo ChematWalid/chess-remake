@@ -1,6 +1,5 @@
 package com.chess.backend.features.game.service;
 
-import com.chess.backend.common.exception.NotFoundException;
 import com.chess.backend.features.game.exception.InvalidGameResultException;
 import com.chess.backend.features.game.exception.InvalidPlayerIdException;
 import com.chess.backend.features.game.exception.InvalidReplayDataException;
