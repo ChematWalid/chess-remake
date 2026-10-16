@@ -87,7 +87,14 @@ public class FriendService {
                 }
                 throw new FriendRequestAlreadyPendingException("A friend request is already pending");
             }
-            relation.setStatus(FriendshipStatus.PENDING);
+            if (relation.getStatus() == FriendshipStatus.DECLINED
+                    && !relation.getRequester().getId().equals(requesterId)) {
+                friendships.delete(relation);
+                friendships.flush();
+                friendships.save(new Friendship(requester, target, FriendshipStatus.PENDING));
+            } else {
+                relation.setStatus(FriendshipStatus.PENDING);
+            }
         } else friendships.save(new Friendship(requester, target, FriendshipStatus.PENDING));
         messages.publish(target.getId(), "/queue/notifications",
                 new UserNotification(NotificationType.FRIEND_REQUEST, requester.getPublicId().toString()));

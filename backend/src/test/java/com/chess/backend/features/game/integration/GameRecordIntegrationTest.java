@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chess.backend.features.social.dto.FriendRequestSummary;
 import com.chess.backend.features.social.service.FriendService;
+import com.chess.backend.features.social.domain.enums.FriendshipStatus;
 import com.chess.backend.features.challenge.domain.GameChallenge;
 import com.chess.backend.features.challenge.domain.enums.ChallengeStatus;
 import com.chess.backend.features.challenge.domain.enums.GameSide;
@@ -324,6 +325,10 @@ class GameRecordIntegrationTest {
         mockMvc.perform(get("/api/games/user/{publicUserId}", game.getChallenger().getPublicId())
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].whitePublicUserId")
+                        .value(game.getChallenger().getPublicId().toString()))
+                .andExpect(jsonPath("$.data.items[0].blackPublicUserId")
+                        .value(game.getChallenged().getPublicId().toString()))
                 .andExpect(jsonPath("$.data.items[0].winnerPublicUserId")
                         .value(game.getChallenger().getPublicId().toString()));
     }
@@ -339,9 +344,6 @@ class GameRecordIntegrationTest {
 
         challengeService.send(challenger.getId(), new SendChallengeRequest(challenged.getUsername(), GameSide.WHITE, 300, 0));
 
-        mockMvc.perform(get("/api/challenges/outgoing").header("Authorization", "Bearer " + challengerToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"));
         String outgoing = mockMvc.perform(get("/api/challenges/outgoing")
                         .header("Authorization", "Bearer " + challengerToken))
                 .andExpect(status().isOk())
@@ -365,6 +367,23 @@ class GameRecordIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         assertThat(white).contains(challenged.getPublicId().toString());
         assertThat(black).contains(challenger.getPublicId().toString());
+    }
+
+    @Test
+    void retryAfterDeclineUsesTheRetryingUserAsRequester() {
+        User first = verifiedUser("friend-first-user");
+        User second = verifiedUser("friend-second-user");
+
+        friendService.request(first.getId(), second.getUsername());
+        long requestId = friendService.incoming(second.getId()).getFirst().requestId();
+        friendService.decline(second.getId(), requestId);
+        friendService.request(second.getId(), first.getUsername());
+
+        var incoming = friendService.incoming(first.getId()).getFirst();
+        var outgoing = friendService.outgoing(second.getId()).getFirst();
+        assertThat(incoming.publicUserId()).isEqualTo(second.getPublicId());
+        assertThat(outgoing.publicUserId()).isEqualTo(first.getPublicId());
+        assertThat(outgoing.status()).isEqualTo(FriendshipStatus.PENDING);
     }
 
     private int submitTogether(String payload, CountDownLatch ready, CountDownLatch start) throws Exception {

@@ -148,9 +148,11 @@ public class GameHistoryService {
                 ? game.getWhiteUsernameSnapshot() : game.getWhitePlayer().getUsername();
         String blackUsername = game.getBlackPlayer() == null
                 ? game.getBlackUsernameSnapshot() : game.getBlackPlayer().getUsername();
+        UUID whitePublicUserId = game.getWhitePlayer() == null ? null : game.getWhitePlayer().getPublicId();
+        UUID blackPublicUserId = game.getBlackPlayer() == null ? null : game.getBlackPlayer().getPublicId();
         UUID winnerPublicUserId = game.getWinner() == null ? null : game.getWinner().getPublicId();
-        return new GameSummary(game.getId(), whiteUsername, blackUsername, game.isDraw(), winnerPublicUserId,
-                game.getTerminationReason().name(), game.getTotalMoves(), game.getPlayedAt());
+        return new GameSummary(game.getId(), whiteUsername, blackUsername, game.isDraw(), whitePublicUserId,
+                blackPublicUserId, winnerPublicUserId, game.getTerminationReason().name(), game.getTotalMoves(), game.getPlayedAt());
     }
 
     private static GameDetail toDetail(GameHistory game) {

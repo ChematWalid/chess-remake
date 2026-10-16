@@ -69,6 +69,7 @@ Google OAuth starts at `/oauth2/authorization/google`. The backend redirects to 
 - When the game ends, the C++ server posts room code, player IDs, winner/draw, termination reason, move count, duration, PGN, SAN moves, and FEN snapshots to `POST /api/internal/games/record`, with `X-Internal-Token` matching `APP_INTERNAL_TOKEN` and the C++ server’s `INTERNAL_WEBHOOK_SECRET`.
 - `roomToken` is a legacy C++ payload property currently equal to `roomCode`; the backend ignores it. Room identity is established by the room code and locked accepted challenge. The internal header authenticates the C++ service. Numeric user IDs remain inside the trusted engine token and webhook contract; public client APIs use opaque UUIDs.
 - A successful first delivery returns `201`; an identical repeat returns `200`. Both are successful delivery outcomes. A report updates both players’ stats and writes replay history atomically.
+- Game history summaries include `whitePublicUserId` and `blackPublicUserId` (nullable if an account was deleted), so clients can link each recorded player to their profile without exposing database IDs.
 
 ## Local setup and integration readiness
 
