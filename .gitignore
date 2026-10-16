@@ -33,3 +33,6 @@ Thumbs.db
 
 # ── Local project docs (not for repo) ────────────────────────────────────────
 CONVENTIONS.md
+backend/target/
+backend/.env
+backend/uploads/
