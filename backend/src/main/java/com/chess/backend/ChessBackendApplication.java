@@ -1,6 +1,6 @@
 package com.chess.backend;
 
-import com.chess.backend.config.AppProperties;
+import com.chess.backend.common.config.AppProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
