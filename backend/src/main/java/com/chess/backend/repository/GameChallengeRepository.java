@@ -16,6 +16,9 @@ public interface GameChallengeRepository extends JpaRepository<GameChallenge, Lo
     @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged where challenge.id = :id")
     Optional<GameChallenge> lockById(@Param("id") long id);
     Optional<GameChallenge> findByRoomCode(String roomCode);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged where challenge.roomCode = :roomCode")
+    Optional<GameChallenge> lockByRoomCode(@Param("roomCode") String roomCode);
     boolean existsByRoomCode(String roomCode);
     @Query("select count(challenge) > 0 from GameChallenge challenge where challenge.status = 'PENDING' "
             + "and challenge.expiresAt > :now and ((challenge.challenger.id = :first and challenge.challenged.id = :second) "

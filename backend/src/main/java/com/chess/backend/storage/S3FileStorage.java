@@ -44,12 +44,27 @@ public class S3FileStorage implements FileStorage {
 
     @PostConstruct
     void ensureBucketExists() {
-        try {
-            client.headBucket(HeadBucketRequest.builder().bucket(properties.s3Bucket()).build());
-        } catch (S3Exception exception) {
-            if (exception.statusCode() != 404) throw exception;
-            client.createBucket(CreateBucketRequest.builder().bucket(properties.s3Bucket()).build());
+        RuntimeException lastFailure = null;
+        for (int attempt = 0; attempt < 20; attempt++) {
+            try {
+                client.headBucket(HeadBucketRequest.builder().bucket(properties.s3Bucket()).build());
+                return;
+            } catch (S3Exception exception) {
+                if (exception.statusCode() == 404) {
+                    client.createBucket(CreateBucketRequest.builder().bucket(properties.s3Bucket()).build());
+                    return;
+                }
+                lastFailure = exception;
+            } catch (RuntimeException exception) {
+                lastFailure = exception;
+            }
+            try { Thread.sleep(1500); }
+            catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while waiting for object storage", exception);
+            }
         }
+        throw new IllegalStateException("Could not initialize object storage", lastFailure);
     }
 
     @Override

@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import com.chess.backend.domain.enums.UserRole;
+import com.chess.backend.domain.enums.GameResult;
 import java.time.Instant;
 
 @Entity
@@ -60,13 +61,12 @@ public class User {
     public void setPasswordHash(String value) { passwordHash = value; }
     public void requireOAuthOnboarding() { onboardingComplete = false; role = UserRole.ROLE_ONBOARDING; }
     public void completeOAuthOnboarding(String newUsername) { username = newUsername; onboardingComplete = true; role = UserRole.ROLE_USER; }
-    public void recordResult(String result) {
+    public void recordResult(GameResult result) {
         totalGames++;
         switch (result) {
-            case "WIN" -> wins++;
-            case "LOSS" -> losses++;
-            case "DRAW" -> draws++;
-            default -> throw new IllegalArgumentException("Unknown result");
+            case WIN -> wins++;
+            case LOSS -> losses++;
+            case DRAW -> draws++;
         }
     }
 }

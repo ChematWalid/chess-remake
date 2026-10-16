@@ -9,6 +9,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import com.chess.backend.domain.enums.TerminationReason;
 import java.time.Instant;
 import java.util.List;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -26,7 +29,7 @@ public class GameHistory {
     @Column(name = "black_username_snapshot", nullable = false, length = 30) private String blackUsernameSnapshot;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "winner_player_id") private User winner;
     @Column(name = "is_draw", nullable = false) private boolean draw;
-    @Column(name = "termination_reason", nullable = false, length = 40) private String terminationReason;
+    @Enumerated(EnumType.STRING) @Column(name = "termination_reason", nullable = false, length = 40) private TerminationReason terminationReason;
     @Column(name = "initial_time_seconds") private Integer initialTimeSeconds;
     @Column(name = "increment_seconds") private Integer incrementSeconds;
     @Column(name = "total_moves", nullable = false) private int totalMoves;
@@ -39,7 +42,7 @@ public class GameHistory {
     protected GameHistory() { }
     public GameHistory(GameChallenge challenge, String roomCode, User whitePlayer, User blackPlayer,
                        String whiteUsernameSnapshot, String blackUsernameSnapshot, User winner, boolean draw,
-                       String terminationReason, Integer initialTimeSeconds, Integer incrementSeconds,
+                       TerminationReason terminationReason, Integer initialTimeSeconds, Integer incrementSeconds,
                        int totalMoves, String pgn, List<String> moves, List<String> fens, Instant playedAt, int durationSeconds) {
         this.challenge = challenge; this.roomCode = roomCode; this.whitePlayer = whitePlayer; this.blackPlayer = blackPlayer;
         this.whiteUsernameSnapshot = whiteUsernameSnapshot; this.blackUsernameSnapshot = blackUsernameSnapshot;
@@ -57,7 +60,7 @@ public class GameHistory {
     public String getBlackUsernameSnapshot() { return blackUsernameSnapshot; }
     public User getWinner() { return winner; }
     public boolean isDraw() { return draw; }
-    public String getTerminationReason() { return terminationReason; }
+    public TerminationReason getTerminationReason() { return terminationReason; }
     public Integer getInitialTimeSeconds() { return initialTimeSeconds; }
     public Integer getIncrementSeconds() { return incrementSeconds; }
     public int getTotalMoves() { return totalMoves; }
