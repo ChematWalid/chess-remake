@@ -426,6 +426,37 @@ export function GamePage({ live = false }: { live?: boolean }) {
     return () => window.clearInterval(timer);
   }, [playing, detail.data]);
 
+  useEffect(() => {
+    if (live || !detail.data || !("moves" in detail.data)) return;
+    const moveCount = detail.data.moves.length;
+
+    const handleReviewKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select, [role='dialog']"))
+      )
+        return;
+
+      let nextIndex: number | null = null;
+      if (event.key === "ArrowLeft") nextIndex = Math.max(0, index - 1);
+      else if (event.key === "ArrowRight")
+        nextIndex = Math.min(moveCount, index + 1);
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = moveCount;
+
+      if (nextIndex !== null) {
+        event.preventDefault();
+        setPlaying(false);
+        setIndex(nextIndex);
+      }
+    };
+
+    window.addEventListener("keydown", handleReviewKeyDown);
+    return () => window.removeEventListener("keydown", handleReviewKeyDown);
+  }, [live, detail.data, index]);
+
   const replay =
     !live && detail.data && "summary" in detail.data
       ? (detail.data as GameDetail)
