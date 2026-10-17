@@ -50,7 +50,8 @@ TEST(JwtTokenTest, RejectTamperedOrWrongSecret) {
     EXPECT_FALSE(wrongSecretResult.has_value());
 
     std::string tampered = token;
-    tampered.back() = (tampered.back() == 'a') ? 'b' : 'a';
+    auto signatureStart = tampered.rfind('.') + 1;
+    tampered[signatureStart] = (tampered[signatureStart] == 'a') ? 'b' : 'a';
     auto tamperedResult = net::JwtToken::verify(tampered, secret);
     EXPECT_FALSE(tamperedResult.has_value());
 }

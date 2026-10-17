@@ -19,6 +19,7 @@ import com.chess.backend.features.challenge.repository.GameChallengeRepository;
 import com.chess.backend.features.challenge.service.ChallengeService;
 import com.chess.backend.features.challenge.dto.SendChallengeRequest;
 import com.chess.backend.features.game.repository.GameHistoryRepository;
+import com.chess.backend.features.game.dto.GameStartRequest;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.repository.UserRepository;
 import com.chess.backend.features.user.service.ProfileService;
@@ -156,6 +157,43 @@ class GameRecordIntegrationTest {
                 .andExpect(status().isUnauthorized());
 
         assertThat(histories.count()).isZero();
+    }
+
+    @Test
+    void engineMustConfirmBothPlayersBeforeARecordCanBeSaved() throws Exception {
+        GameChallenge challenge = acceptedChallenge("ROOM07");
+        challenge.setStatus(ChallengeStatus.ACCEPTED);
+        GameChallenge unstated = challenges.save(challenge);
+        unstated.markStarted(null);
+
+        mockMvc.perform(post("/api/internal/games/record")
+                        .header("X-Internal-Token", INTERNAL_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload(unstated, "ROOM07", "ROOM07", false, "1")))
+                .andExpect(status().isConflict());
+
+        assertThat(histories.findByRoomCode("ROOM07")).isEmpty();
+    }
+
+    @Test
+    void engineStartHandshakeIsAuthenticatedAndIdempotent() throws Exception {
+        GameChallenge challenge = acceptedChallenge("ROOM08");
+        challenge.markStarted(null);
+        challenges.save(challenge);
+        String request = objectMapper.writeValueAsString(new GameStartRequest(
+                "ROOM08", challenge.getChallenger().getId().toString(),
+                challenge.getChallenged().getId().toString()));
+
+        mockMvc.perform(post("/api/internal/games/start").contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/internal/games/start").header("X-Internal-Token", INTERNAL_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/internal/games/start").header("X-Internal-Token", INTERNAL_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isNoContent());
+
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStartedAt()).isNotNull();
     }
 
     @Test
@@ -404,7 +442,8 @@ class GameRecordIntegrationTest {
         User challenged = verifiedUser("black-" + roomCode.toLowerCase());
         GameChallenge challenge = new GameChallenge(challenger, challenged, 300, 0, GameSide.WHITE,
                 clock.instant().plus(Duration.ofMinutes(5)));
-        challenge.accept(roomCode, GameSide.WHITE);
+        challenge.accept(roomCode, GameSide.WHITE, clock.instant());
+        challenge.markStarted(clock.instant());
         return challenges.save(challenge);
     }
 

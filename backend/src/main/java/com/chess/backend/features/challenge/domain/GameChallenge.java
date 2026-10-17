@@ -31,6 +31,8 @@ public class GameChallenge {
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 30) private ChallengeStatus status;
     @Column(name = "expires_at", nullable = false) private Instant expiresAt;
     @Column(name = "created_at", insertable = false, updatable = false) private Instant createdAt;
+    @Column(name = "accepted_at") private Instant acceptedAt;
+    @Column(name = "started_at") private Instant startedAt;
     protected GameChallenge() { }
     public GameChallenge(User challenger, User challenged, Integer initialTimeSeconds, Integer incrementSeconds,
                          GameSide challengerSide, Instant expiresAt) {
@@ -49,6 +51,14 @@ public class GameChallenge {
     public ChallengeStatus getStatus() { return status; }
     public Instant getExpiresAt() { return expiresAt; }
     public Instant getCreatedAt() { return createdAt; }
-    public void accept(String roomCode, GameSide challengerColor) { this.roomCode = roomCode; this.challengerColor = challengerColor; this.status = ChallengeStatus.ACCEPTED; }
+    public Instant getAcceptedAt() { return acceptedAt; }
+    public Instant getStartedAt() { return startedAt; }
+    public void accept(String roomCode, GameSide challengerColor, Instant acceptedAt) {
+        this.roomCode = roomCode;
+        this.challengerColor = challengerColor;
+        this.acceptedAt = acceptedAt;
+        this.status = ChallengeStatus.ACCEPTED;
+    }
+    public void markStarted(Instant startedAt) { this.startedAt = startedAt; }
     public void setStatus(ChallengeStatus status) { this.status = status; }
 }

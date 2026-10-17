@@ -103,7 +103,18 @@ std::optional<PlayerToken> JwtToken::verify(
         return std::nullopt;
     }
     auto dot2 = token.find('.', dot1 + 1);
-    if (dot2 == std::string::npos) {
+    if (dot2 == std::string::npos || token.find('.', dot2 + 1) != std::string::npos) {
+        return std::nullopt;
+    }
+
+    const std::string headerJson = base64UrlDecode(token.substr(0, dot1));
+    try {
+        const auto header = nlohmann::json::parse(headerJson);
+        if (!header.is_object() || header.value("alg", std::string{}) != "HS256"
+                || header.value("typ", std::string{}) != "JWT") {
+            return std::nullopt;
+        }
+    } catch (...) {
         return std::nullopt;
     }
 
@@ -113,7 +124,7 @@ std::optional<PlayerToken> JwtToken::verify(
     std::string expectedSig = computeHmacSha256(toSign, secret);
     std::string actualSig = base64UrlDecode(signatureB64);
 
-    if (expectedSig.size() != actualSig.size()) {
+    if (expectedSig.size() != actualSig.size() || base64UrlEncode(actualSig) != signatureB64) {
         return std::nullopt;
     }
     if (CRYPTO_memcmp(expectedSig.data(), actualSig.data(), expectedSig.size()) != 0) {
@@ -133,16 +144,16 @@ std::optional<PlayerToken> JwtToken::verify(
         return std::nullopt;
     }
 
-    int64_t exp = 0;
-    if (j.contains("exp") && j["exp"].is_number()) {
-        exp = j["exp"].get<int64_t>();
+    if (!j.is_object() || !j.contains("exp") || !j["exp"].is_number_integer()) {
+        return std::nullopt;
     }
+    int64_t exp = j["exp"].get<int64_t>();
 
     auto now = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now().time_since_epoch()
     ).count();
 
-    if (exp > 0 && now > exp) {
+    if (now >= exp) {
         return std::nullopt;
     }
 
@@ -181,6 +192,12 @@ std::optional<PlayerToken> JwtToken::verify(
         pt.incrementSeconds = j["incrementSeconds"].get<int64_t>();
     } else if (j.contains("increment_seconds") && j["increment_seconds"].is_number()) {
         pt.incrementSeconds = j["increment_seconds"].get<int64_t>();
+    }
+
+    if (pt.roomCode.empty() || pt.userId.empty() || pt.displayName.empty()
+            || (pt.color != "white" && pt.color != "black")
+            || pt.initialSeconds < 0 || pt.incrementSeconds < 0) {
+        return std::nullopt;
     }
 
     return pt;

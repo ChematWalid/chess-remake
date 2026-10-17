@@ -2,6 +2,7 @@ package com.chess.backend.features.game.controller;
 
 
 import com.chess.backend.features.game.dto.GameRecordRequest;
+import com.chess.backend.features.game.dto.GameStartRequest;
 import com.chess.backend.features.game.service.GameHistoryService;
 import com.chess.backend.features.game.dto.GameDetail;
 import com.chess.backend.features.game.dto.GameSummary;
@@ -39,6 +40,13 @@ public class GameHistoryController {
                                 @NotNull @Valid @RequestBody GameRecordRequest request) {
         boolean created = service.record(secret, request);
         return ResponseEntity.status(created ? HttpStatus.CREATED : HttpStatus.OK).build();
+    }
+
+    @PostMapping("/internal/games/start")
+    ResponseEntity<Void> start(@RequestHeader(name = "X-Internal-Token", required = false) String secret,
+                               @NotNull @Valid @RequestBody GameStartRequest request) {
+        service.start(secret, request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/games/my-history")

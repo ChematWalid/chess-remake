@@ -16,6 +16,7 @@ import com.chess.backend.features.game.exception.InvalidEngineCredentialsExcepti
 
 
 import com.chess.backend.features.game.dto.GameRecordRequest;
+import com.chess.backend.features.game.dto.GameStartRequest;
 import com.chess.backend.common.config.AppProperties;
 import com.chess.backend.features.challenge.domain.GameChallenge;
 import com.chess.backend.features.game.domain.GameHistory;
@@ -104,6 +105,9 @@ public class GameHistoryService {
         if (challenge.getStatus() != ChallengeStatus.ACCEPTED) {
             throw new GameRoomInactiveException("Game room is not active");
         }
+        if (challenge.getStartedAt() == null) {
+            throw new GameRoomInactiveException("Game room was not confirmed as started");
+        }
         User white = challenge.getChallengerColor() == GameSide.WHITE ? challenge.getChallenger() : challenge.getChallenged();
         User black = white.getId().equals(challenge.getChallenger().getId()) ? challenge.getChallenged() : challenge.getChallenger();
         if (!white.getId().toString().equals(request.whitePlayerId()) || !black.getId().toString().equals(request.blackPlayerId()))
@@ -124,6 +128,33 @@ public class GameHistoryService {
         challenges.complete(challenge);
         eventPublisher.publishEvent(new GameRecordedEvent(saved.getId(), white.getId(), black.getId()));
         return true;
+    }
+
+    @Transactional
+    public void start(String secret, GameStartRequest request) {
+        if (!constantTimeEquals(properties.internalToken(), secret)) {
+            throw new InvalidEngineCredentialsException("Invalid engine credentials");
+        }
+        GameChallenge challenge = challenges.lockRoom(request.roomCode());
+        if (challenge.getStatus() != ChallengeStatus.ACCEPTED) {
+            throw new GameRoomInactiveException("Game room is not active");
+        }
+        User white = challenge.getChallengerColor() == GameSide.WHITE
+                ? challenge.getChallenger() : challenge.getChallenged();
+        User black = white.getId().equals(challenge.getChallenger().getId())
+                ? challenge.getChallenged() : challenge.getChallenger();
+        if (!white.getId().toString().equals(request.whitePlayerId())
+                || !black.getId().toString().equals(request.blackPlayerId())) {
+            throw new GameRoomMismatchException("Game players do not match the room assignment");
+        }
+        if (challenge.getStartedAt() != null) {
+            return;
+        }
+        if (challenge.getAcceptedAt() == null
+                || !challenge.getAcceptedAt().plus(properties.gameStartTimeout()).isAfter(clock.instant())) {
+            throw new GameRoomInactiveException("Game room start window has expired");
+        }
+        challenge.markStarted(clock.instant());
     }
 
     private User findWinner(String rawId) {

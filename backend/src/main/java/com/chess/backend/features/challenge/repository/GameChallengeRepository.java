@@ -38,4 +38,12 @@ public interface GameChallengeRepository extends JpaRepository<GameChallenge, Lo
     @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged "
             + "where challenge.status = :pending and challenge.expiresAt <= :now order by challenge.expiresAt")
     List<GameChallenge> lockExpired(@Param("now") Instant now, @Param("pending") ChallengeStatus pending, Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged "
+            + "where challenge.status = :accepted and challenge.startedAt is null "
+            + "and challenge.acceptedAt <= :deadline order by challenge.acceptedAt")
+    List<GameChallenge> lockNotStartedBefore(@Param("deadline") Instant deadline,
+                                             @Param("accepted") ChallengeStatus accepted,
+                                             Pageable pageable);
 }

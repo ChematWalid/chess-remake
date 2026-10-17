@@ -73,21 +73,40 @@ export function GamePage({ live = false }: { live?: boolean }) {
       !detail.data.connectUrl
     )
       return;
-    const connectUrl = detail.data.connectUrl;
+    const initialConnection = detail.data;
     let stopped = false;
     let retryTimer: number | undefined;
     let hasWarned = false;
-    const connect = () => {
+    const connect = async (refreshCredentials: boolean) => {
       if (stopped) return;
-      const ws = new WebSocket(connectUrl);
+      let connection = initialConnection;
+      if (refreshCredentials) {
+        try {
+          connection = await getChallenge(Number(challengeId));
+        } catch {
+          if (!stopped)
+            retryTimer = window.setTimeout(() => void connect(true), 3000);
+          return;
+        }
+      }
+      if (stopped) return;
+      if (connection.status !== "ACCEPTED" || !connection.connectUrl || !connection.token) {
+        setFinished("This accepted game is no longer available.");
+        return;
+      }
+      const ws = new WebSocket(connection.connectUrl);
       socket.current = ws;
       ws.onopen = () => {
-        setConnected(true);
+        ws.send(JSON.stringify({
+          action: "connect_token",
+          room_code: connection.roomCode,
+          token: connection.token,
+        }));
         hasWarned = false;
       };
       ws.onclose = () => {
         setConnected(false);
-        if (!stopped) retryTimer = window.setTimeout(connect, 1500);
+        if (!stopped) retryTimer = window.setTimeout(() => void connect(true), 1500);
       };
       ws.onerror = () => {
         if (!hasWarned)
@@ -101,7 +120,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
       ws.onmessage = (message) => {
         try {
           const event = JSON.parse(String(message.data)) as EngineEvent;
+          if (event.event === "room_created" || event.event === "room_joined") {
+            setConnected(true);
+          }
           if (event.event === "game_started" && event.fen) {
+            setConnected(true);
             setFen(event.fen);
             setClock({
               white: event.white_time_ms ?? 0,
@@ -168,7 +191,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
         }
       };
     };
-    connect();
+    void connect(false);
     return () => {
       stopped = true;
       if (retryTimer) window.clearTimeout(retryTimer);
@@ -367,6 +390,13 @@ export function GamePage({ live = false }: { live?: boolean }) {
     return (
       <ErrorState
         message={detail.error?.message ?? "Game was not found"}
+        onRetry={() => void detail.refetch()}
+      />
+    );
+  if (live && "status" in detail.data && detail.data.status !== "ACCEPTED")
+    return (
+      <ErrorState
+        message="This challenge is no longer an active game. Return to Play to start another match."
         onRetry={() => void detail.refetch()}
       />
     );

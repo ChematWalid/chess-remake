@@ -6,34 +6,9 @@ Connects via WebSocket, renders the board in ANSI ASCII, and lets players take t
 
 import argparse
 import asyncio
-import base64
-import hashlib
-import hmac
 import json
-import random
-import string
 import sys
-import time
 import websockets
-
-def make_jwt_token(room_code: str, user_id: str, display_name: str, color: str = "", initial_seconds: int = 0, increment_seconds: int = 0, secret: str = "chess_secret_dev_key") -> str:
-    header = '{"alg":"HS256","typ":"JWT"}'
-    claims = {
-        "room_code": room_code,
-        "user_id": user_id,
-        "display_name": display_name,
-        "color": color,
-        "initial_seconds": initial_seconds,
-        "increment_seconds": increment_seconds,
-        "exp": int(time.time()) + 86400
-    }
-    def b64url(data: bytes) -> str:
-        return base64.urlsafe_b64encode(data).decode('ascii').rstrip('=')
-    h_b64 = b64url(header.encode('utf-8'))
-    p_b64 = b64url(json.dumps(claims).encode('utf-8'))
-    to_sign = f"{h_b64}.{p_b64}"
-    sig = hmac.new(secret.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
-    return f"{to_sign}.{b64url(sig)}"
 
 def render_board(fen: str) -> str:
     """Renders the board from a FEN string matching the C++ BoardRenderer style."""
@@ -62,12 +37,9 @@ def format_clock(ms: int) -> str:
     return f"{mins:02d}:{secs:02d}"
 
 class ChessCliClient:
-    def __init__(self, ws_url: str, create_room: bool, room_code: str, preferred_color: str, time_control: str, token: str, player_name: str):
+    def __init__(self, ws_url: str, room_code: str, token: str, player_name: str):
         self.ws_url = ws_url
-        self.create_room = create_room
         self.room_code = room_code
-        self.preferred_color = preferred_color
-        self.time_control = time_control
         self.token = token
         self.player_name = player_name
         self.my_color = None
@@ -79,9 +51,7 @@ class ChessCliClient:
         self.black_time_ms = -1
 
     async def run(self):
-        url = self.ws_url
-        if self.token and self.room_code:
-            url = f"{self.ws_url}/ws/play?room={self.room_code}&token={self.token}"
+        url = self.ws_url.rstrip("/")
 
         print(f"\n=========================================")
         print(f"       CHESS TERMINAL CLIENT ({self.player_name})")
@@ -91,33 +61,14 @@ class ChessCliClient:
         try:
             async with websockets.connect(url) as ws:
                 print("✓ Connected to server.")
-
-                # If not using token URL, handle create/join room via actions
-                if not (self.token and self.room_code):
-                    if self.create_room:
-                        create_payload = {
-                            "action": "create_room",
-                            "preferred_color": self.preferred_color
-                        }
-                        if self.time_control == "unlimited":
-                            create_payload["time_control"] = "unlimited"
-                        else:
-                            try:
-                                mins = float(self.time_control)
-                                create_payload["time_control"] = {"minutes": mins}
-                            except ValueError:
-                                create_payload["time_control"] = "unlimited"
-
-                        await ws.send(json.dumps(create_payload))
-                    elif self.room_code:
-                        join_payload = {
-                            "action": "join_room",
-                            "room_code": self.room_code
-                        }
-                        await ws.send(json.dumps(join_payload))
-                    else:
-                        print("Error: Specify either --create or --room <CODE>.")
-                        return
+                if not self.room_code or not self.token:
+                    print("Error: backend-issued --room and --token are required.")
+                    return
+                await ws.send(json.dumps({
+                    "action": "connect_token",
+                    "room_code": self.room_code,
+                    "token": self.token,
+                }))
 
                 # Start background receive task and interactive input loop
                 receive_task = asyncio.create_task(self.receive_loop(ws))
@@ -278,52 +229,18 @@ class ChessCliClient:
 
 def main():
     parser = argparse.ArgumentParser(description="C++ Chess Server CLI Client")
-    parser.add_argument("--url", default="ws://127.0.0.1:9002", help="WebSocket server URL")
-    parser.add_argument("--create", action="store_true", help="Create a new game room")
-    parser.add_argument("--room", default="", help="Room code to join / reconnect")
-    parser.add_argument("--color", default="white", choices=["white", "black", "random"], help="Preferred color when creating")
-    parser.add_argument("--time-control", default="unlimited", help="Time control ('unlimited' or minutes)")
-    parser.add_argument("--user-id", default="", help="Unique user ID for seat ownership and reconnecting (e.g. 'walid', 'alice')")
-    parser.add_argument("--secret", default="chess_secret_dev_key", help="JWT secret matching CHESS_JWT_SECRET on server")
-    parser.add_argument("--token", default="", help="Direct JWT auth token")
+    parser.add_argument("--url", default="ws://127.0.0.1:9002/ws/play", help="WebSocket endpoint")
+    parser.add_argument("--room", required=True, help="Room code returned by the backend")
+    parser.add_argument("--token", required=True, help="Short-lived room token returned by the backend")
     parser.add_argument("--name", default="Player", help="Player label for output")
 
     args = parser.parse_args()
 
-    room_code = args.room.strip().upper()
-    token = args.token
-
-    if args.user_id:
-        if args.create and not room_code:
-            charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-            room_code = "".join(random.choices(charset, k=6))
-
-        if room_code and not token:
-            pref_color = args.color if args.create else ""
-            init_sec = 0
-            if args.time_control != "unlimited":
-                try:
-                    init_sec = int(float(args.time_control) * 60)
-                except ValueError:
-                    init_sec = 0
-            token = make_jwt_token(
-                room_code=room_code,
-                user_id=args.user_id,
-                display_name=args.name if args.name != "Player" else args.user_id,
-                color=pref_color,
-                initial_seconds=init_sec,
-                increment_seconds=0,
-                secret=args.secret
-            )
-
     client = ChessCliClient(
         ws_url=args.url,
-        create_room=args.create,
-        room_code=room_code,
-        preferred_color=args.color,
-        time_control=args.time_control,
-        token=token,
-        player_name=args.name if args.name != "Player" else (args.user_id or "Player")
+        room_code=args.room.strip().upper(),
+        token=args.token,
+        player_name=args.name
     )
 
     try:

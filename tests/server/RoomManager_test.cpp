@@ -57,6 +57,14 @@ private:
     bool closed_{false};
 };
 
+std::string createAndJoinRoom(net::RoomManager& manager,
+                              const std::shared_ptr<MockSession>& white,
+                              const std::shared_ptr<MockSession>& black) {
+    auto room = manager.createRoom(white, chess::ChessClock::TimeControl::unlimited(), chess::Color::White);
+    manager.joinRoom(room->getRoomCode(), black);
+    return room->getRoomCode();
+}
+
 }
 
 /**
@@ -67,11 +75,7 @@ TEST(RoomManagerTest, CreateRoomAndJoinFlow) {
     auto host = std::make_shared<MockSession>("session-host");
     auto friendSession = std::make_shared<MockSession>("session-friend");
 
-    manager.routeMessage(host, R"({
-        "action": "create_room",
-        "time_control": "unlimited",
-        "preferred_color": "white"
-    })");
+    manager.createRoom(host, chess::ChessClock::TimeControl::unlimited(), chess::Color::White);
 
     ASSERT_EQ(manager.activeRoomCount(), 1u);
     auto hostJson = host->lastJson();
@@ -80,10 +84,7 @@ TEST(RoomManagerTest, CreateRoomAndJoinFlow) {
     std::string roomCode = hostJson["room_code"].get<std::string>();
     EXPECT_EQ(roomCode.length(), 6u);
 
-    manager.routeMessage(friendSession, nlohmann::json{
-        {"action", "join_room"},
-        {"room_code", roomCode}
-    }.dump());
+    manager.joinRoom(roomCode, friendSession);
 
     auto friendJson = friendSession->lastJson();
     EXPECT_EQ(friendJson["event"], "game_started");
@@ -102,9 +103,7 @@ TEST(RoomManagerTest, UntimedGameMoveExecution) {
     auto white = std::make_shared<MockSession>("white-player");
     auto black = std::make_shared<MockSession>("black-player");
 
-    manager.routeMessage(white, R"({"action": "create_room", "time_control": "unlimited", "preferred_color": "white"})");
-    std::string code = white->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(black, nlohmann::json{{"action", "join_room"}, {"room_code", code}}.dump());
+    std::string code = createAndJoinRoom(manager, white, black);
 
     white->clear();
     black->clear();
@@ -140,9 +139,7 @@ TEST(RoomManagerTest, MutualDrawProtocol) {
     auto white = std::make_shared<MockSession>("white-p");
     auto black = std::make_shared<MockSession>("black-p");
 
-    manager.routeMessage(white, R"({"action": "create_room", "time_control": "unlimited", "preferred_color": "white"})");
-    std::string code = white->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(black, nlohmann::json{{"action", "join_room"}, {"room_code", code}}.dump());
+    std::string code = createAndJoinRoom(manager, white, black);
 
     white->clear();
     black->clear();
@@ -169,9 +166,7 @@ TEST(RoomManagerTest, ResignationEndsGameImmediately) {
     auto white = std::make_shared<MockSession>("white-p");
     auto black = std::make_shared<MockSession>("black-p");
 
-    manager.routeMessage(white, R"({"action": "create_room", "time_control": "unlimited", "preferred_color": "white"})");
-    std::string code = white->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(black, nlohmann::json{{"action", "join_room"}, {"room_code", code}}.dump());
+    std::string code = createAndJoinRoom(manager, white, black);
 
     white->clear();
     black->clear();
@@ -197,11 +192,9 @@ TEST(RoomManagerTest, SpectatorReceivesGameStateAndCannotMove) {
     auto black = std::make_shared<MockSession>("black-p");
     auto spec = std::make_shared<MockSession>("spectator-p");
 
-    manager.routeMessage(white, R"({"action": "create_room", "time_control": "unlimited", "preferred_color": "white"})");
-    std::string code = white->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(black, nlohmann::json{{"action", "join_room"}, {"room_code", code}}.dump());
+    std::string code = createAndJoinRoom(manager, white, black);
 
-    manager.routeMessage(spec, nlohmann::json{{"action", "join_room"}, {"room_code", code}}.dump());
+    manager.joinRoom(code, spec);
     EXPECT_EQ(spec->lastJson()["event"], "game_started");
 
     spec->clear();
@@ -217,15 +210,11 @@ TEST(RoomManagerTest, MultiRoomIsolation) {
 
     auto w1 = std::make_shared<MockSession>("w1");
     auto b1 = std::make_shared<MockSession>("b1");
-    manager.routeMessage(w1, R"({"action": "create_room", "preferred_color": "white"})");
-    std::string code1 = w1->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(b1, nlohmann::json{{"action", "join_room"}, {"room_code", code1}}.dump());
+    std::string code1 = createAndJoinRoom(manager, w1, b1);
 
     auto w2 = std::make_shared<MockSession>("w2");
     auto b2 = std::make_shared<MockSession>("b2");
-    manager.routeMessage(w2, R"({"action": "create_room", "preferred_color": "white"})");
-    std::string code2 = w2->lastJson()["room_code"].get<std::string>();
-    manager.routeMessage(b2, nlohmann::json{{"action", "join_room"}, {"room_code", code2}}.dump());
+    std::string code2 = createAndJoinRoom(manager, w2, b2);
 
     EXPECT_EQ(manager.activeRoomCount(), 2u);
     EXPECT_NE(code1, code2);

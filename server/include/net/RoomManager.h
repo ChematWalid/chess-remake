@@ -22,7 +22,8 @@ public:
     RoomManager(
         std::shared_ptr<WebhookClient> webhookClient = nullptr,
         std::string jwtSecret = "",
-        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60)
+        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60),
+        std::chrono::seconds roomStartTimeout = std::chrono::seconds(120)
     );
     ~RoomManager() = default;
 
@@ -119,6 +120,7 @@ private:
     std::shared_ptr<WebhookClient> webhookClient_;
     std::string jwtSecret_;
     std::chrono::seconds disconnectGracePeriod_;
+    std::chrono::seconds roomStartTimeout_;
 };
 
 } /* namespace net */

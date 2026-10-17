@@ -189,7 +189,7 @@ export const challengeEventSchema = z.object({
   eventType: z.string(),
   challengeId: z.number().int(),
   status: challengeStatusSchema,
-  actorPublicUserId: z.string().uuid(),
+  actorPublicUserId: z.string().uuid().nullable(),
   otherUsername: z.string().optional(),
   otherDisplayName: z.string().optional(),
   roomCode: z.string().optional(),

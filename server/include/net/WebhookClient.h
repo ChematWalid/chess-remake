@@ -44,7 +44,8 @@ public:
     WebhookClient(
         std::string endpointUrl = "",
         std::string internalToken = "",
-        std::filesystem::path outboxDir = ".outbox"
+        std::filesystem::path outboxDir = ".outbox",
+        std::string startEndpointUrl = ""
     );
 
     /**
@@ -71,6 +72,13 @@ public:
     void enqueue(const GameRecordPayload& payload);
 
     /**
+     * @brief Confirms both players and the room assignment with the backend before starting play.
+     */
+    [[nodiscard]] bool markGameStarted(const std::string& roomCode,
+                                       const std::string& whitePlayerId,
+                                       const std::string& blackPlayerId);
+
+    /**
      * @brief Returns count of pending game record files in outbox directory.
      */
     [[nodiscard]] size_t pendingOutboxCount() const;
@@ -92,9 +100,16 @@ public:
     [[nodiscard]] const std::filesystem::path& getOutboxDir() const;
 
 private:
+    enum class DeliveryResult {
+        Delivered,
+        Retry,
+        PermanentFailure
+    };
+
     std::string endpointUrl_;
     std::string internalToken_;
     std::filesystem::path outboxDir_;
+    std::string startEndpointUrl_;
 
     std::atomic<bool> running_{false};
     std::thread workerThread_;
@@ -102,7 +117,7 @@ private:
     std::condition_variable cv_;
 
     void workerLoop();
-    bool sendPayload(const std::string& jsonString);
+    [[nodiscard]] DeliveryResult sendPayload(const std::string& jsonString);
 };
 
 } /* namespace net */

@@ -10,13 +10,14 @@ WebSocketServer::WebSocketServer(
     std::string host,
     std::shared_ptr<WebhookClient> webhookClient,
     std::string jwtSecret,
-    std::chrono::seconds disconnectGracePeriod
+    std::chrono::seconds disconnectGracePeriod,
+    std::chrono::seconds roomStartTimeout
 )
     : port_(port),
       host_(std::move(host)),
       server_(port_, host_),
       webhookClient_(std::move(webhookClient)),
-      roomManager_(webhookClient_, std::move(jwtSecret), disconnectGracePeriod) {}
+      roomManager_(webhookClient_, std::move(jwtSecret), disconnectGracePeriod, roomStartTimeout) {}
 
 WebSocketServer::~WebSocketServer() {
     stop();
@@ -182,44 +183,10 @@ void WebSocketServer::handleConnectionOpen(
     const std::shared_ptr<WebSocketSession>& session,
     const std::string& uri
 ) {
-    if (uri.find("/ws/play") == std::string::npos) {
-        return;
+    if (uri != "/ws/play") {
+        session->send(Protocol::error("Unsupported WebSocket endpoint"));
+        session->close();
     }
-    auto qPos = uri.find('?');
-    if (qPos == std::string::npos) {
-        session->send(Protocol::error("Missing room and token query parameters"));
-        return;
-    }
-    std::string queryString = uri.substr(qPos + 1);
-    std::string roomCode;
-    std::string token;
-
-    size_t start = 0;
-    while (start < queryString.size()) {
-        size_t end = queryString.find('&', start);
-        if (end == std::string::npos) {
-            end = queryString.size();
-        }
-        std::string pair = queryString.substr(start, end - start);
-        size_t eq = pair.find('=');
-        if (eq != std::string::npos) {
-            std::string key = pair.substr(0, eq);
-            std::string val = pair.substr(eq + 1);
-            if (key == "room") {
-                roomCode = val;
-            } else if (key == "token") {
-                token = val;
-            }
-        }
-        start = end + 1;
-    }
-
-    if (roomCode.empty() || token.empty()) {
-        session->send(Protocol::error("Missing room or token query parameters"));
-        return;
-    }
-
-    roomManager_.handleTokenConnect(session, roomCode, token);
 }
 
 }

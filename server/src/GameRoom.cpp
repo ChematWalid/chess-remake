@@ -5,6 +5,7 @@
 #include "chess/rules/GameRules.h"
 #include "net/Protocol.h"
 #include <algorithm>
+#include <iostream>
 #include <random>
 
 namespace net {
@@ -218,9 +219,22 @@ bool GameRoom::joinWithIdentity(
         role = "spectator";
     }
 
+    if (state_ == RoomState::WaitingForOpponent && whiteSession_ && blackSession_) {
+        gameStarting = true;
+    }
+
     sendToSession(session, Protocol::roomJoined(roomCode_, role));
 
     if (gameStarting) {
+        if (webhookClient_ && !webhookClient_->markGameStarted(roomCode_, whitePlayerId_, blackPlayerId_)) {
+            if (role == "white") {
+                whiteSession_.reset();
+            } else {
+                blackSession_.reset();
+            }
+            sendToSession(session, Protocol::error("Backend could not confirm this game room"));
+            return false;
+        }
         state_ = RoomState::InProgress;
         startedAt_ = std::chrono::system_clock::now();
         if (!timeControl_.isUnlimited) {
@@ -407,6 +421,14 @@ void GameRoom::handleDisconnect(const std::string& sessionId) {
 void GameRoom::tickClock() {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    if (state_ == RoomState::WaitingForOpponent
+            && std::chrono::steady_clock::now() - createdAt_ >= startTimeout_) {
+        dead_ = true;
+        state_ = RoomState::Finished;
+        broadcast(Protocol::error("Game room expired before both players joined"));
+        return;
+    }
+
     if (state_ != RoomState::InProgress) {
         return;
     }
@@ -449,6 +471,11 @@ void GameRoom::broadcast(const std::string& message) {
 void GameRoom::setDisconnectGracePeriod(std::chrono::seconds gracePeriod) {
     std::lock_guard<std::mutex> lock(mutex_);
     disconnectGracePeriod_ = gracePeriod;
+}
+
+void GameRoom::setStartTimeout(std::chrono::seconds timeout) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    startTimeout_ = timeout;
 }
 
 void GameRoom::markDead() {
@@ -537,7 +564,12 @@ void GameRoom::finishGame(const std::string& resultStr,
         payload.moves = getAllMovesSan();
         payload.fens = getAllFens();
 
-        webhookClient_->enqueue(payload);
+        try {
+            webhookClient_->enqueue(payload);
+        } catch (const std::exception& exception) {
+            std::cerr << "CRITICAL: completed game could not be written to webhook outbox for room "
+                      << roomCode_ << ": " << exception.what() << '\n';
+        }
     }
 }
 

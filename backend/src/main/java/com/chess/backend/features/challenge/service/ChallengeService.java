@@ -107,7 +107,7 @@ public class ChallengeService {
             case RANDOM -> roomCodeGenerator.randomBoolean() ? GameSide.WHITE : GameSide.BLACK;
         };
         GameSide challengedColor = opposite(challengerColor);
-        challenge.accept(roomCode, challengerColor);
+        challenge.accept(roomCode, challengerColor, clock.instant());
         presence.gameStarted(challenge.getChallenger().getId(), challenge.getChallenged().getId());
         sendMatch(challenge, challenge.getChallenger(), challengerColor);
         sendMatch(challenge, challenge.getChallenged(), challengedColor);
@@ -138,7 +138,7 @@ public class ChallengeService {
         if (challenge.getStatus() == ChallengeStatus.ACCEPTED) {
             token = jwtService.createRoomToken(challenge.getRoomCode(), caller.getId(), caller.getDisplayName(), color,
                     challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds());
-            connectUrl = properties.engineWsUrl() + "?room=" + challenge.getRoomCode() + "&token=" + token;
+            connectUrl = properties.engineWsUrl();
         }
         return new ChallengeDetail(challenge.getId(), challenge.getStatus(), opponent.getPublicId(), opponent.getUsername(),
                 challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getChallengerSide(), color,
@@ -155,6 +155,22 @@ public class ChallengeService {
     public void complete(GameChallenge challenge) {
         challenge.setStatus(ChallengeStatus.COMPLETED);
         presence.gameCompleted(challenge.getChallenger().getId(), challenge.getChallenged().getId());
+    }
+
+    @Transactional
+    public void expireNotStarted() {
+        Instant deadline = clock.instant().minus(properties.gameStartTimeout());
+        var expired = challenges.lockNotStartedBefore(deadline, ChallengeStatus.ACCEPTED,
+                PageRequest.of(0, EXPIRATION_BATCH_SIZE));
+        for (GameChallenge challenge : expired) {
+            challenge.setStatus(ChallengeStatus.EXPIRED);
+            presence.gameCompleted(challenge.getChallenger().getId(), challenge.getChallenged().getId());
+            ChallengeEvent event = event(challenge, ChallengeEventType.STATUS_CHANGED, ChallengeStatus.EXPIRED,
+                    null, null, null, null, null, null, null,
+                    "Game room expired before both players connected");
+            messages.publish(challenge.getChallenger().getId(), "/queue/challenges", event);
+            messages.publish(challenge.getChallenged().getId(), "/queue/challenges", event);
+        }
     }
 
     @Transactional
@@ -175,6 +191,12 @@ public class ChallengeService {
             challenge.setStatus(ChallengeStatus.EXPIRED);
             notifyStatus(challenge, null, ChallengeStatus.EXPIRED);
         }
+    }
+
+    @Scheduled(fixedDelay = 15000)
+    @Transactional
+    public void expireAcceptedNotStarted() {
+        expireNotStarted();
     }
 
     private void changePending(long challengeId, long actorId, boolean challengerOnly, ChallengeStatus status) {
@@ -202,10 +224,10 @@ public class ChallengeService {
     private void sendMatch(GameChallenge challenge, User recipient, GameSide color) {
         String token = jwtService.createRoomToken(challenge.getRoomCode(), recipient.getId(), recipient.getDisplayName(), color,
                 challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds());
-        String url = properties.engineWsUrl() + "?room=" + challenge.getRoomCode() + "&token=" + token;
+        String url = properties.engineWsUrl();
         messages.publish(recipient.getId(), "/queue/challenges",
                 event(challenge, ChallengeEventType.MATCH_ASSIGNED, ChallengeStatus.ACCEPTED,
-                        challenge.getChallenger().getPublicId(), null, null, color, challenge.getRoomCode(), url, token, null));
+                        challenge.getChallenger().getPublicId(), null, null, color, challenge.getRoomCode(), url, null, null));
     }
 
     private void sendChallengeEvent(long recipientId, GameChallenge challenge, ChallengeEventType type,

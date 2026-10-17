@@ -15,6 +15,7 @@ public record AppProperties(
         Duration accessTokenTtl,
         Duration refreshTokenTtl,
         Duration roomTokenTtl,
+        Duration gameStartTimeout,
         Duration invitationTtl,
         boolean cookieSecure,
         String cookieSameSite,
@@ -61,6 +62,7 @@ public record AppProperties(
         if (accessTokenTtl == null || accessTokenTtl.isNegative() || accessTokenTtl.isZero()
                 || refreshTokenTtl == null || refreshTokenTtl.isNegative() || refreshTokenTtl.isZero()
                 || roomTokenTtl == null || roomTokenTtl.isNegative() || roomTokenTtl.isZero()
+                || gameStartTimeout == null || gameStartTimeout.isNegative() || gameStartTimeout.isZero()
                 || invitationTtl == null || invitationTtl.isNegative() || invitationTtl.isZero()) {
             throw new IllegalStateException("Token lifetimes must be positive");
         }

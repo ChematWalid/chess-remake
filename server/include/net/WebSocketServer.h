@@ -26,7 +26,8 @@ public:
         std::string host = "0.0.0.0",
         std::shared_ptr<WebhookClient> webhookClient = nullptr,
         std::string jwtSecret = "",
-        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60)
+        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60),
+        std::chrono::seconds roomStartTimeout = std::chrono::seconds(120)
     );
     ~WebSocketServer();
 

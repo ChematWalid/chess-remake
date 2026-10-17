@@ -9,11 +9,13 @@ namespace net {
 RoomManager::RoomManager(
     std::shared_ptr<WebhookClient> webhookClient,
     std::string jwtSecret,
-    std::chrono::seconds disconnectGracePeriod
+    std::chrono::seconds disconnectGracePeriod,
+    std::chrono::seconds roomStartTimeout
 )
     : webhookClient_(std::move(webhookClient)),
       jwtSecret_(std::move(jwtSecret)),
-      disconnectGracePeriod_(disconnectGracePeriod) {}
+      disconnectGracePeriod_(disconnectGracePeriod),
+      roomStartTimeout_(roomStartTimeout) {}
 
 std::shared_ptr<GameRoom> RoomManager::createRoom(
     std::shared_ptr<IClientSession> hostSession,
@@ -56,6 +58,7 @@ std::shared_ptr<GameRoom> RoomManager::createRoom(
         webhookClient_
     );
     room->setDisconnectGracePeriod(disconnectGracePeriod_);
+    room->setStartTimeout(roomStartTimeout_);
     rooms_[code] = room;
     sessionToRoom_[hostSession->getId()] = code;
 
@@ -99,6 +102,7 @@ std::shared_ptr<GameRoom> RoomManager::createRoomWithIdentity(
         webhookClient_
     );
     room->setDisconnectGracePeriod(disconnectGracePeriod_);
+    room->setStartTimeout(roomStartTimeout_);
     rooms_[roomCode] = room;
     if (hostSession) {
         sessionToRoom_[hostSession->getId()] = roomCode;
@@ -175,27 +179,7 @@ void RoomManager::routeMessage(
 
     std::string action = j["action"].get<std::string>();
 
-    if (action == "create_room") {
-        auto params = Protocol::parseCreateRoom(j);
-        if (params) {
-            createRoom(session, params->timeControl, params->preferredColor);
-        } else {
-            session->send(Protocol::error("Invalid time control or room parameters"));
-        }
-        return;
-    }
-
-    if (action == "join_room") {
-        auto code = Protocol::parseJoinRoom(j);
-        if (code) {
-            joinRoom(*code, session);
-        } else {
-            session->send(Protocol::error("Missing 'room_code' field"));
-        }
-        return;
-    }
-
-    if (action == "connect_token" || action == "join_with_token") {
+    if (action == "connect_token") {
         std::string roomCode;
         std::string token;
         if (j.contains("room_code") && j["room_code"].is_string()) {
@@ -207,10 +191,19 @@ void RoomManager::routeMessage(
             token = j["token"].get<std::string>();
         }
         if (!roomCode.empty() && !token.empty()) {
-            handleTokenConnect(session, roomCode, token);
+            if (!handleTokenConnect(session, roomCode, token)) {
+                session->close();
+            }
         } else {
             session->send(Protocol::error("Missing 'room_code' or 'token'"));
+            session->close();
         }
+        return;
+    }
+
+    if (action == "create_room" || action == "join_room" || action == "join_with_token") {
+        session->send(Protocol::error("This room action is no longer supported"));
+        session->close();
         return;
     }
 

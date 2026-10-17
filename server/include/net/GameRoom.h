@@ -111,6 +111,11 @@ public:
     void setDisconnectGracePeriod(std::chrono::seconds gracePeriod);
 
     /**
+     * @brief Configures how long a reserved room can wait for its second player.
+     */
+    void setStartTimeout(std::chrono::seconds timeout);
+
+    /**
      * @brief Explicitly marks the room as dead.
      */
     void markDead();
@@ -141,6 +146,8 @@ private:
     std::vector<std::shared_ptr<IClientSession>> spectators_;
 
     std::chrono::seconds disconnectGracePeriod_{60};
+    std::chrono::seconds startTimeout_{120};
+    std::chrono::steady_clock::time_point createdAt_{std::chrono::steady_clock::now()};
     std::optional<std::chrono::steady_clock::time_point> whiteDisconnectedAt_;
     std::optional<std::chrono::steady_clock::time_point> blackDisconnectedAt_;
     std::optional<std::chrono::system_clock::time_point> startedAt_;

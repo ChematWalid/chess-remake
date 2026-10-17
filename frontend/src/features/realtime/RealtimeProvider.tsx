@@ -121,6 +121,14 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
               }
               if (destination.endsWith("/challenges")) {
                 const challenge = challengeEventSchema.parse(payload);
+                void cache.invalidateQueries({ queryKey: ["challenges"] });
+                if (challenge.eventType === "STATUS_CHANGED" && challenge.status === "EXPIRED") {
+                  notifications.show({
+                    title: "Game room expired",
+                    message: "Both players did not connect in time. You can send a new challenge.",
+                    color: "yellow",
+                  });
+                }
                 if (
                   challenge.eventType === "INVITATION_RECEIVED" &&
                   settingsRef.current.inAppNotificationsEnabled
