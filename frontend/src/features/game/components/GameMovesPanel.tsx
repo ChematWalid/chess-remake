@@ -21,8 +21,11 @@ interface GameMovesPanelProps {
   replay: GameDetail | null;
   onChallengeFromPosition: () => void;
   index: number;
+  livePositionIndex: number | null;
+  livePositionsCount: number;
   playing: boolean;
   onIndexChange: (index: number) => void;
+  onLivePositionChange: (index: number | null) => void;
   onPlayingChange: (playing: boolean) => void;
 }
 
@@ -36,8 +39,11 @@ export function GameMovesPanel({
   replay,
   onChallengeFromPosition,
   index,
+  livePositionIndex,
+  livePositionsCount,
   playing,
   onIndexChange,
+  onLivePositionChange,
   onPlayingChange,
 }: GameMovesPanelProps) {
   return (
@@ -47,13 +53,85 @@ export function GameMovesPanel({
           <Group justify="space-between">
             <Text fw={700}>Moves</Text>
             <Text size="sm" c="dimmed">
-              {connected ? "Live" : "Offline"}
+              {livePositionIndex === null
+                ? connected
+                  ? "Live"
+                  : "Offline"
+                : `Viewing ${livePositionIndex}/${livePositionsCount - 1}`}
             </Text>
           </Group>
+          {livePositionsCount > 0 && (
+            <Group mt="sm" justify="center">
+              <Tooltip label="First position">
+                <ActionIcon
+                  variant="subtle"
+                  onClick={() => onLivePositionChange(0)}
+                  aria-label="First position"
+                >
+                  <IconPlayerTrackPrev size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Previous move">
+                <ActionIcon
+                  variant="subtle"
+                  onClick={() =>
+                    onLivePositionChange(
+                      Math.max(
+                        0,
+                        (livePositionIndex ?? livePositionsCount - 1) - 1,
+                      ),
+                    )
+                  }
+                  aria-label="Previous move"
+                  disabled={(livePositionIndex ?? livePositionsCount - 1) === 0}
+                >
+                  <IconPlayerTrackPrev size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Next move">
+                <ActionIcon
+                  variant="subtle"
+                  onClick={() => {
+                    const next =
+                      (livePositionIndex ?? livePositionsCount - 1) + 1;
+                    onLivePositionChange(
+                      next >= livePositionsCount - 1 ? null : next,
+                    );
+                  }}
+                  aria-label="Next move"
+                  disabled={livePositionIndex === null}
+                >
+                  <IconPlayerTrackNext size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Return to live position">
+                <ActionIcon
+                  variant="subtle"
+                  onClick={() => onLivePositionChange(null)}
+                  aria-label="Return to live position"
+                  disabled={livePositionIndex === null}
+                >
+                  <IconPlayerTrackNext size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          )}
           {moveText.length ? (
             <ol className="move-list">
               {moveText.map((move, i) => (
-                <li key={`${i}-${move}`}>{move}</li>
+                <li key={`${i}-${move}`}>
+                  <Button
+                    variant={
+                      (livePositionIndex ?? livePositionsCount - 1) === i + 1
+                        ? "light"
+                        : "subtle"
+                    }
+                    size="compact-xs"
+                    onClick={() => onLivePositionChange(i + 1)}
+                  >
+                    {move}
+                  </Button>
+                </li>
               ))}
             </ol>
           ) : (

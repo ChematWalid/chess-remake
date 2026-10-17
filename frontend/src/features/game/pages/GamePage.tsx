@@ -57,6 +57,29 @@ function fenForTurn(fen: string, color: "white" | "black"): string {
   return fields.join(" ");
 }
 
+function buildLivePositions(
+  event: EngineEvent,
+  initialFen: string | null,
+): string[] {
+  const positions = event.setup_fens?.length
+    ? [...event.setup_fens]
+    : [initialFen ?? new Chess().fen()];
+  const lastPosition = positions.at(-1) ?? event.fen ?? new Chess().fen();
+  const game = new Chess(lastPosition);
+  for (const move of event.moves ?? []) {
+    try {
+      game.move(move);
+      positions.push(game.fen());
+    } catch {
+      return event.fen ? [event.fen] : positions;
+    }
+  }
+  if (event.fen && positions.at(-1) !== event.fen) {
+    positions[positions.length - 1] = event.fen;
+  }
+  return positions;
+}
+
 function projectPremove(
   game: Chess,
   move: PendingMove,
@@ -185,6 +208,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const navigate = useNavigate();
   const [fen, setFen] = useState("start");
   const [moveText, setMoveText] = useState<string[]>([]);
+  const [livePositions, setLivePositions] = useState<string[]>([]);
+  const [livePositionIndex, setLivePositionIndex] = useState<number | null>(
+    null,
+  );
   const [selected, setSelected] = useState<Square | null>(null);
   const [boardResetKey, setBoardResetKey] = useState(0);
   const [premoves, setPremoves] = useState<PendingMove[]>([]);
@@ -354,6 +381,12 @@ export function GamePage({ live = false }: { live?: boolean }) {
             setConnected(true);
             setFen(event.fen);
             setMoveText([...(event.setup_moves ?? []), ...(event.moves ?? [])]);
+            const initialFen =
+              "initialFen" in detail.data && detail.data.initialFen
+                ? detail.data.initialFen
+                : null;
+            setLivePositions(buildLivePositions(event, initialFen));
+            setLivePositionIndex(null);
             setClock({
               white:
                 event.white_time_ms ??
@@ -396,6 +429,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
             }
             clearOptimisticMove();
             setFen(event.fen);
+            setLivePositions((positions) => [
+              ...positions,
+              event.fen as string,
+            ]);
             setDrawOfferedBy(null);
             setDrawOfferSent(false);
             setClock((current) =>
@@ -524,8 +561,13 @@ export function GamePage({ live = false }: { live?: boolean }) {
   }, [playing, detail.data]);
 
   useEffect(() => {
-    if (live || !detail.data || !("moves" in detail.data)) return;
-    const moveCount = detail.data.moves.length + detail.data.setupMoves.length;
+    if (!live && (!detail.data || !("moves" in detail.data))) return;
+    const moveCount = live
+      ? moveText.length
+      : "moves" in detail.data!
+        ? detail.data!.moves.length + detail.data!.setupMoves.length
+        : 0;
+    const currentIndex = live ? (livePositionIndex ?? moveCount) : index;
 
     const handleReviewKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
@@ -537,22 +579,24 @@ export function GamePage({ live = false }: { live?: boolean }) {
         return;
 
       let nextIndex: number | null = null;
-      if (event.key === "ArrowLeft") nextIndex = Math.max(0, index - 1);
+      if (event.key === "ArrowLeft") nextIndex = Math.max(0, currentIndex - 1);
       else if (event.key === "ArrowRight")
-        nextIndex = Math.min(moveCount, index + 1);
+        nextIndex = Math.min(moveCount, currentIndex + 1);
       else if (event.key === "Home") nextIndex = 0;
       else if (event.key === "End") nextIndex = moveCount;
 
       if (nextIndex !== null) {
         event.preventDefault();
         setPlaying(false);
-        setIndex(nextIndex);
+        if (live)
+          setLivePositionIndex(nextIndex === moveCount ? null : nextIndex);
+        else setIndex(nextIndex);
       }
     };
 
     window.addEventListener("keydown", handleReviewKeyDown);
     return () => window.removeEventListener("keydown", handleReviewKeyDown);
-  }, [live, detail.data, index]);
+  }, [live, detail.data, index, moveText.length, livePositionIndex]);
 
   const replayRecord =
     !live && detail.data && "summary" in detail.data
@@ -628,8 +672,13 @@ export function GamePage({ live = false }: { live?: boolean }) {
       ? new Chess().fen()
       : fen;
   const displayedFen = useMemo(() => {
-    const position = live ? (optimisticMove?.fen ?? currentFen) : currentFen;
-    if (!live || !premoves.length) return position;
+    const position = live
+      ? livePositionIndex === null
+        ? (optimisticMove?.fen ?? currentFen)
+        : (livePositions[livePositionIndex] ?? currentFen)
+      : currentFen;
+    if (!live || livePositionIndex !== null || !premoves.length)
+      return position;
     const projection = new Chess(position);
     for (const move of premoves) {
       if (
@@ -640,8 +689,23 @@ export function GamePage({ live = false }: { live?: boolean }) {
       }
     }
     return projection.fen();
-  }, [live, optimisticMove, premoves, currentFen, color]);
+  }, [
+    live,
+    livePositionIndex,
+    livePositions,
+    optimisticMove,
+    premoves,
+    currentFen,
+    color,
+  ]);
   const turn = useMemo(() => {
+    try {
+      return new Chess(displayedFen).turn();
+    } catch {
+      return "w";
+    }
+  }, [displayedFen]);
+  const currentTurn = useMemo(() => {
     try {
       return new Chess(currentFen).turn();
     } catch {
@@ -670,7 +734,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
     selected && prefs.showLegalMoveHints
       ? (() => {
           const game = new Chess(undefined, { skipValidation: true });
-          if (live && turn !== (color === "white" ? "w" : "b")) {
+          if (live && currentTurn !== (color === "white" ? "w" : "b")) {
             game.load(fenForTurn(displayedFen, color), {
               skipValidation: true,
             });
@@ -746,9 +810,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
   }
 
   function attemptMove(from: Square, to: Square) {
-    if (optimisticMoveRef.current) return;
+    if (optimisticMoveRef.current || livePositionIndex !== null) return;
     const game = new Chess(currentFen);
-    if (turn !== (color === "white" ? "w" : "b")) {
+    if (currentTurn !== (color === "white" ? "w" : "b")) {
       if (prefs.premovesEnabled) {
         const move = { from, to };
         if (!isLegalPremove(displayedFen, move, color)) {
@@ -808,7 +872,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       !live ||
       !connected ||
       premoves.length === 0 ||
-      turn !== (color === "white" ? "w" : "b") ||
+      currentTurn !== (color === "white" ? "w" : "b") ||
       optimisticMoveRef.current
     )
       return;
@@ -831,15 +895,23 @@ export function GamePage({ live = false }: { live?: boolean }) {
     }
     if (sendEngineMove(queued, currentFen))
       updatePremoves(livePreferences.current.premoves.slice(1));
-  }, [live, connected, premoves, turn, color, currentFen, optimisticMove]);
+  }, [
+    live,
+    connected,
+    premoves,
+    currentTurn,
+    color,
+    currentFen,
+    optimisticMove,
+  ]);
 
   function onSquareClick(square: string) {
-    if (optimisticMoveRef.current) return;
+    if (optimisticMoveRef.current || livePositionIndex !== null) return;
     const target = square as Square;
     if (selected) {
       const piece = new Chess(displayedFen).get(target);
       if (piece && piece.color === color[0]) {
-        const waitingForTurn = turn !== (color === "white" ? "w" : "b");
+        const waitingForTurn = currentTurn !== (color === "white" ? "w" : "b");
         const premove = { from: selected, to: target };
         if (
           live &&
@@ -887,6 +959,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
     },
     canDragPiece: ({ piece }) =>
       live &&
+      livePositionIndex === null &&
       !finished &&
       !optimisticMove &&
       piece.pieceType.startsWith(color === "white" ? "w" : "b"),
@@ -1086,8 +1159,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
             })
           }
           index={index}
+          livePositionIndex={livePositionIndex}
+          livePositionsCount={livePositions.length}
           playing={playing}
           onIndexChange={setIndex}
+          onLivePositionChange={setLivePositionIndex}
           onPlayingChange={setPlaying}
         />
       </div>
