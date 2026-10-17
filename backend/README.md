@@ -25,7 +25,7 @@ For local development without Docker:
 mvn spring-boot:run
 ```
 
-Set the database, storage, mail, and required token secrets in the environment first. `APP_JWT_SECRET`, `APP_ENGINE_JWT_SECRET`, and `APP_INTERNAL_TOKEN` must each be strong values of at least 32 bytes/characters. `APP_ENGINE_JWT_SECRET` must match the C++ server's `CHESS_JWT_SECRET`; `APP_INTERNAL_TOKEN` must match `INTERNAL_WEBHOOK_SECRET` on the game server.
+Set the database, storage, mail, and required token secrets in the environment first. `APP_JWT_SECRET`, `APP_ENGINE_JWT_SECRET`, and `APP_INTERNAL_TOKEN` must each be strong values of at least 32 bytes/characters. `APP_ENGINE_JWT_SECRET` must match the C++ server's `CHESS_JWT_SECRET`; `APP_INTERNAL_TOKEN` must match `INTERNAL_WEBHOOK_SECRET` on the game server. C++ runtime setup is documented in [server/README.md](../server/README.md).
 
 ## Main routes
 

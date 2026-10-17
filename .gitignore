@@ -35,4 +35,5 @@ Thumbs.db
 CONVENTIONS.md
 backend/target/
 backend/.env
+server/.env
 backend/uploads/

@@ -11,16 +11,7 @@ RoomManager::RoomManager(
     std::string jwtSecret
 )
     : webhookClient_(std::move(webhookClient)),
-      jwtSecret_(std::move(jwtSecret)) {
-    if (jwtSecret_.empty()) {
-        const char* envSecret = std::getenv("CHESS_JWT_SECRET");
-        if (envSecret && envSecret[0] != '\0') {
-            jwtSecret_ = envSecret;
-        } else {
-            jwtSecret_ = "chess_secret_dev_key";
-        }
-    }
-}
+      jwtSecret_(std::move(jwtSecret)) {}
 
 std::shared_ptr<GameRoom> RoomManager::createRoom(
     std::shared_ptr<IClientSession> hostSession,

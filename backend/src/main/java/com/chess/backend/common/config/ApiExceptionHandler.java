@@ -20,6 +20,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -67,6 +69,10 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<AppResponse<Void>> handleUploadTooLarge() {
         return error(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE", "The uploaded file exceeds the configured size limit");
+    }
+    @ExceptionHandler({MultipartException.class, MissingServletRequestPartException.class})
+    ResponseEntity<AppResponse<Void>> handleMalformedMultipart() {
+        return error(HttpStatus.BAD_REQUEST, "INVALID_MULTIPART_REQUEST", "A valid multipart request and required file part are expected");
     }
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<AppResponse<Void>> handleAuthentication() { return error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", "Authentication failed"); }

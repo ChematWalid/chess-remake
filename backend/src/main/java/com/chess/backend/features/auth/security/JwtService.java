@@ -63,7 +63,7 @@ public class JwtService {
         claims.put("increment_seconds", incrementSeconds == null ? 0 : incrementSeconds);
         return Jwts.builder().claims(claims).id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plus(properties.roomTokenTtl())))
-                .signWith(engineKey()).compact();
+                .signWith(engineKey(), Jwts.SIG.HS256).compact();
     }
 
     private SecretKey accessKey() {

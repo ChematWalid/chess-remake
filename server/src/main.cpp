@@ -1,11 +1,21 @@
 #include "net/WebSocketServer.h"
 #include <atomic>
 #include <csignal>
+#include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 namespace {
 std::atomic<bool> g_shutdownRequested{false};
+
+std::string requiredEnvironment(const char* name) {
+    const char* value = std::getenv(name);
+    if (value == nullptr || value[0] == '\0') {
+        throw std::runtime_error(std::string("Missing required environment variable: ") + name);
+    }
+    return value;
+}
 
 void signalHandler(int /*signal*/) {
     g_shutdownRequested.store(true);
@@ -13,19 +23,22 @@ void signalHandler(int /*signal*/) {
 }
 
 int main(int argc, char* argv[]) {
-    int port = 9002;
-    std::string host = "0.0.0.0";
-
-    const char* envPort = std::getenv("CHESS_PORT");
-    if (envPort && envPort[0] != '\0') {
-        try {
-            port = std::stoi(envPort);
-        } catch (...) {
+    int port = 0;
+    std::string host;
+    std::string jwtSecret;
+    try {
+        port = std::stoi(requiredEnvironment("CHESS_PORT"));
+        host = requiredEnvironment("CHESS_HOST");
+        jwtSecret = requiredEnvironment("CHESS_JWT_SECRET");
+        requiredEnvironment("SPRING_WEBHOOK_URL");
+        requiredEnvironment("INTERNAL_WEBHOOK_SECRET");
+        requiredEnvironment("CHESS_OUTBOX_DIR");
+        if (port < 1 || port > 65535) {
+            throw std::runtime_error("CHESS_PORT must be between 1 and 65535");
         }
-    }
-    const char* envHost = std::getenv("CHESS_HOST");
-    if (envHost && envHost[0] != '\0') {
-        host = envHost;
+    } catch (const std::exception& exception) {
+        std::cerr << "Configuration error: " << exception.what() << std::endl;
+        return 2;
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -36,7 +49,8 @@ int main(int argc, char* argv[]) {
             host = argv[++i];
         } else if (arg == "--help" || arg == "-h") {
             std::cout << "Usage: chess_server [--port <port>] [--host <host>]\n";
-            std::cout << "Default: --port 9002 --host 0.0.0.0 (or CHESS_PORT/CHESS_HOST)\n";
+            std::cout << "CHESS_PORT, CHESS_HOST, CHESS_JWT_SECRET, SPRING_WEBHOOK_URL, "
+                         "INTERNAL_WEBHOOK_SECRET, and CHESS_OUTBOX_DIR are required.\n";
             return 0;
         }
     }
@@ -54,7 +68,7 @@ int main(int argc, char* argv[]) {
     std::cout << "--------------------------------------------------------\n" << std::endl;
 
     auto webhookClient = std::make_shared<net::WebhookClient>();
-    net::WebSocketServer server(port, host, webhookClient);
+    net::WebSocketServer server(port, host, webhookClient, jwtSecret);
     if (!server.start()) {
         std::cerr << "Error: Could not bind or start WebSocket server on " << host << ":" << port << std::endl;
         return 1;
