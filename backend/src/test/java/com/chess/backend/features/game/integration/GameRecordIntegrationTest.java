@@ -223,7 +223,7 @@ class GameRecordIntegrationTest {
     }
 
     @Test
-    void acceptedRoomExpiresWhenNeitherPlayerStartsIt() {
+    void acceptedRoomIsDeletedWhenNeitherPlayerStartsIt() {
         GameChallenge challenge = acceptedChallenge("ROOM09");
         challenge.accept("ROOM09", GameSide.WHITE, clock.instant().minus(Duration.ofMinutes(3)));
         challenge.markStarted(null);
@@ -231,8 +231,20 @@ class GameRecordIntegrationTest {
 
         challengeService.expireNotStarted();
 
-        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
-                .isEqualTo(ChallengeStatus.EXPIRED);
+        assertThat(challenges.findById(challenge.getId())).isEmpty();
+    }
+
+    @Test
+    void pendingChallengeIsDeletedWhenItsInvitationExpires() {
+        User challenger = verifiedUser("expired-requester");
+        User challenged = verifiedUser("expired-recipient");
+        GameChallenge challenge = challenges.save(new GameChallenge(
+                challenger, challenged, 300, 0, GameSide.WHITE,
+                clock.instant().minus(Duration.ofMinutes(1))));
+
+        challengeService.expirePending();
+
+        assertThat(challenges.findById(challenge.getId())).isEmpty();
     }
 
     @Test
