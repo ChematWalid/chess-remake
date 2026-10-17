@@ -28,6 +28,7 @@ import "./GamePage.css";
 interface EngineEvent {
   event?: string;
   fen?: string;
+  uci?: string;
   san?: string;
   moves?: string[];
   side_to_move?: "white" | "black";
@@ -38,6 +39,11 @@ interface EngineEvent {
   reason?: string;
   message?: string;
   color?: "white" | "black";
+}
+
+interface OptimisticMove {
+  uci: string;
+  fen: string;
 }
 
 function fenForTurn(fen: string, color: "white" | "black"): string {
@@ -119,6 +125,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const [moveText, setMoveText] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
   const [premoves, setPremoves] = useState<PendingMove[]>([]);
+  const [optimisticMove, setOptimisticMove] = useState<OptimisticMove | null>(
+    null,
+  );
   const [pending, setPending] = useState<PendingMove | null>(null);
   const [promotion, setPromotion] = useState<PendingMove | null>(null);
   const [color, setColor] = useState<"white" | "black">("white");
@@ -138,6 +147,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
     null,
   );
   const socket = useRef<WebSocket | null>(null);
+  const optimisticMoveRef = useRef<OptimisticMove | null>(null);
+  const optimisticMoveTimeout = useRef<number | undefined>(undefined);
   const livePreferences = useRef({ color, premoves });
   livePreferences.current = { color, premoves };
   const detail = useQuery<ChallengeDetail | GameDetail>({
@@ -154,6 +165,23 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const settingsRef = useRef(preferences.data);
   settingsRef.current = preferences.data;
   const hasClock = clock !== null;
+
+  function clearOptimisticMove() {
+    if (optimisticMoveTimeout.current !== undefined) {
+      window.clearTimeout(optimisticMoveTimeout.current);
+      optimisticMoveTimeout.current = undefined;
+    }
+    optimisticMoveRef.current = null;
+    setOptimisticMove(null);
+  }
+
+  useEffect(
+    () => () => {
+      if (optimisticMoveTimeout.current !== undefined)
+        window.clearTimeout(optimisticMoveTimeout.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!live || !detail.data || !("playerColor" in detail.data)) return;
@@ -221,6 +249,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       };
       ws.onclose = () => {
         setConnected(false);
+        clearOptimisticMove();
         if (!stopped)
           retryTimer = window.setTimeout(() => void connect(true), 1500);
       };
@@ -240,6 +269,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
             setConnected(true);
           }
           if (event.event === "game_started" && event.fen) {
+            clearOptimisticMove();
             setConnected(true);
             setFen(event.fen);
             setMoveText(event.moves ?? []);
@@ -253,6 +283,20 @@ export function GamePage({ live = false }: { live?: boolean }) {
                 setColor(assignedColor.toLowerCase() as "white" | "black");
             }
           } else if (event.event === "move_made" && event.fen) {
+            const unconfirmedMove = optimisticMoveRef.current;
+            if (
+              unconfirmedMove &&
+              event.uci &&
+              unconfirmedMove.uci !== event.uci
+            ) {
+              notifications.show({
+                title: "Move not accepted",
+                message:
+                  "The server position changed. The board was synchronized.",
+                color: "yellow",
+              });
+            }
+            clearOptimisticMove();
             setFen(event.fen);
             setDrawOfferedBy(null);
             setDrawOfferSent(false);
@@ -284,6 +328,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
               }
             }
           } else if (event.event === "game_over") {
+            clearOptimisticMove();
             setDrawOfferedBy(null);
             setDrawOfferSent(false);
             setFinished(
@@ -308,6 +353,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
               color: "yellow",
             });
           } else if (event.event === "error") {
+            if (optimisticMoveRef.current) clearOptimisticMove();
             notifications.show({
               title: "Move rejected",
               message:
@@ -343,7 +389,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
     if (!live || !connected || !hasClock || finished) return;
     const sideToMove = (() => {
       try {
-        return new Chess(fen === "start" ? undefined : fen).turn();
+        const clockFen = optimisticMove?.fen ?? fen;
+        return new Chess(clockFen === "start" ? undefined : clockFen).turn();
       } catch {
         return "w";
       }
@@ -364,7 +411,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       250,
     );
     return () => window.clearInterval(timer);
-  }, [live, connected, hasClock, finished, fen]);
+  }, [live, connected, hasClock, finished, fen, optimisticMove]);
 
   useEffect(() => {
     if (!playing || !detail.data || !("fens" in detail.data)) return;
@@ -441,8 +488,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
       ? new Chess().fen()
       : fen;
   const displayedFen = useMemo(() => {
-    if (!live || !premoves.length) return currentFen;
-    const projection = new Chess(currentFen);
+    const position = live ? (optimisticMove?.fen ?? currentFen) : currentFen;
+    if (!live || !premoves.length) return position;
+    const projection = new Chess(position);
     for (const move of premoves) {
       if (
         !isLegalPremove(projection.fen(), move, color) ||
@@ -452,7 +500,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       }
     }
     return projection.fen();
-  }, [live, premoves, currentFen, color]);
+  }, [live, optimisticMove, premoves, currentFen, color]);
   const turn = useMemo(() => {
     try {
       return new Chess(currentFen).turn();
@@ -460,12 +508,28 @@ export function GamePage({ live = false }: { live?: boolean }) {
       return "w";
     }
   }, [currentFen]);
+  const checkedKingSquare = useMemo(() => {
+    const game = new Chess(displayedFen);
+    if (!game.isCheck()) return null;
+    return (
+      game
+        .board()
+        .flatMap((rank, rankIndex) =>
+          rank.map((piece, fileIndex) =>
+            piece?.type === "k" && piece.color === game.turn()
+              ? (`${"abcdefgh"[fileIndex]}${8 - rankIndex}` as Square)
+              : null,
+          ),
+        )
+        .find((square) => square !== null) ?? null
+    );
+  }, [displayedFen]);
   const prefs = preferences.data;
   const colors =
     prefs.boardOrientation === "AUTO"
       ? color
       : (prefs.boardOrientation.toLowerCase() as "white" | "black");
-  const legalTargets =
+  const legalMoves =
     selected && prefs.showLegalMoveHints
       ? (() => {
           const game = new Chess(undefined, { skipValidation: true });
@@ -477,31 +541,51 @@ export function GamePage({ live = false }: { live?: boolean }) {
             game.load(displayedFen, { skipValidation: true });
           }
           return game;
-        })()
-          .moves({ square: selected, verbose: true })
-          .map((move) => move.to)
+        })().moves({ square: selected, verbose: true })
       : [];
 
   function sendEngineMove(move: PendingMove, position = currentFen): boolean {
     const ws = socket.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    if (
+      !ws ||
+      ws.readyState !== WebSocket.OPEN ||
+      optimisticMoveRef.current !== null
+    )
+      return false;
     try {
       const game = new Chess(position);
-      if (game.turn() !== (color === "white" ? "w" : "b")) return false;
+      const playerColor = livePreferences.current.color;
+      if (game.turn() !== (playerColor === "white" ? "w" : "b")) return false;
       const applied = game.move({
         from: move.from,
         to: move.to,
         promotion: move.promotion ?? "q",
       });
       if (!applied) return false;
+      const uci = `${move.from}${move.to}${move.promotion ?? applied.promotion ?? ""}`;
+      const optimistic = { uci, fen: game.fen() };
+      optimisticMoveRef.current = optimistic;
+      setOptimisticMove(optimistic);
+      optimisticMoveTimeout.current = window.setTimeout(() => {
+        if (optimisticMoveRef.current !== optimistic) return;
+        optimisticMoveRef.current = null;
+        optimisticMoveTimeout.current = undefined;
+        setOptimisticMove(null);
+        notifications.show({
+          title: "Move confirmation delayed",
+          message: "The board was restored while waiting for the game server.",
+          color: "yellow",
+        });
+      }, 5000);
       ws.send(
         JSON.stringify({
           action: "move",
-          uci: `${move.from}${move.to}${move.promotion ?? applied.promotion ?? ""}`,
+          uci,
         }),
       );
       return true;
     } catch {
+      clearOptimisticMove();
       return false;
     }
   }
@@ -525,6 +609,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
   }
 
   function attemptMove(from: Square, to: Square) {
+    if (optimisticMoveRef.current) return;
     const game = new Chess(currentFen);
     if (turn !== (color === "white" ? "w" : "b")) {
       if (prefs.premovesEnabled) {
@@ -582,6 +667,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
   }
 
   function onSquareClick(square: string) {
+    if (optimisticMoveRef.current) return;
     const target = square as Square;
     if (selected) {
       attemptMove(selected, target);
@@ -598,17 +684,28 @@ export function GamePage({ live = false }: { live?: boolean }) {
     squareStyles: {
       ...(selected ? { [selected]: { background: "#d0bd64aa" } } : {}),
       ...Object.fromEntries(
-        legalTargets.map((square) => [
-          square,
+        legalMoves.map((move) => [
+          move.to,
           {
-            background: "radial-gradient(circle, #647b45 22%, transparent 24%)",
+            background: move.isCapture()
+              ? "radial-gradient(circle, #d64141 25%, #d6414177 29%, transparent 32%)"
+              : "radial-gradient(circle, #647b45 22%, transparent 24%)",
           },
         ]),
       ),
+      ...(checkedKingSquare
+        ? {
+            [checkedKingSquare]: {
+              background:
+                "radial-gradient(circle, #e5484daa 38%, #e5484d66 100%)",
+            },
+          }
+        : {}),
     },
     canDragPiece: ({ piece }) =>
       live &&
       !finished &&
+      !optimisticMove &&
       piece.pieceType.startsWith(color === "white" ? "w" : "b"),
     onSquareClick: ({ square }) => onSquareClick(square),
     onPieceDrop: ({ sourceSquare, targetSquare }) => {
@@ -803,7 +900,12 @@ export function GamePage({ live = false }: { live?: boolean }) {
           const move = { ...promotion, promotion: piece };
           setPromotion(null);
           if (prefs.moveConfirmation) setPending(move);
-          else sendEngineMove(move);
+          else if (!sendEngineMove(move))
+            notifications.show({
+              title: "Move unavailable",
+              message: "The game connection is not ready.",
+              color: "yellow",
+            });
         }}
         onPendingClose={() => setPending(null)}
         onPendingConfirm={() => {
