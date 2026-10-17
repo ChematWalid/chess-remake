@@ -35,7 +35,7 @@ export function HistoryPage() {
       </header>
       {history.isLoading ? (
         <LoadingState label="Loading game history" />
-      ) : history.isError ? (
+      ) : history.isError && !history.data ? (
         <ErrorState
           message={history.error.message}
           onRetry={() => void history.refetch()}

@@ -1,4 +1,5 @@
-import { apiGet, apiPost, apiPut } from "../../../shared/api/client";
+import { z } from "zod";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../../shared/api/client";
 import {
   pageSchema,
   profileSchema,
@@ -8,6 +9,8 @@ import {
   type SearchResult,
   type Page,
   type UserSettings,
+  userDraftSchema,
+  type UserDraft,
 } from "../../../shared/api/types";
 
 export interface ProfileUpdate {
@@ -56,4 +59,20 @@ export async function updateSettings(
   settings: UserSettings,
 ): Promise<UserSettings> {
   return apiPut("/api/users/me/settings", settings, userSettingsSchema);
+}
+export async function getMyDrafts(): Promise<UserDraft[]> {
+  return apiGet("/api/users/me/drafts", undefined, z.array(userDraftSchema));
+}
+export async function saveMyDraft(
+  featureKey: string,
+  payload: unknown,
+): Promise<UserDraft> {
+  return apiPut(
+    `/api/users/me/drafts/${encodeURIComponent(featureKey)}`,
+    { payload },
+    userDraftSchema,
+  );
+}
+export async function deleteMyDraft(featureKey: string): Promise<void> {
+  await apiDelete(`/api/users/me/drafts/${encodeURIComponent(featureKey)}`);
 }

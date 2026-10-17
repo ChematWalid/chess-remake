@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { MantineProvider } from "@mantine/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./shared/auth/AuthProvider";
+import { BrowserQueryCache } from "./shared/storage/BrowserQueryCache";
 import { AppRoutes } from "./routes/AppRoutes";
 import { SettingsAppearance } from "./shared/settings/SettingsAppearance";
 import { theme } from "./shared/settings/theme";
@@ -13,9 +14,11 @@ import "./styles/global.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 20_000, retry: 1, refetchOnWindowFocus: false },
+    queries: { staleTime: 60_000, retry: 1, refetchOnWindowFocus: true },
   },
 });
+queryClient.setQueryDefaults(["challenges"], { staleTime: 0 });
+queryClient.setQueryDefaults(["challenge-detail"], { staleTime: 0 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -23,9 +26,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <SettingsAppearance>
-              <AppRoutes />
-            </SettingsAppearance>
+            <BrowserQueryCache queryClient={queryClient}>
+              <SettingsAppearance>
+                <AppRoutes />
+              </SettingsAppearance>
+            </BrowserQueryCache>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

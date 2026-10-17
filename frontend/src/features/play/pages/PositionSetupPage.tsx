@@ -20,6 +20,8 @@ import type {
   BoardPiece,
   ChallengePosition,
 } from "../../position/utils/positionUtils";
+import { DraftStatus } from "../../../shared/drafts/DraftStatus";
+import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
 
 interface EditorSnapshot {
   mode: "MOVES" | "DIRECT";
@@ -34,6 +36,15 @@ interface EditorHistory {
   future: EditorSnapshot[];
 }
 
+interface PositionEditorDraft {
+  mode: "MOVES" | "DIRECT";
+  fen: string;
+  start: string;
+  fenInput: string;
+  setupMoves: string[];
+  setupFens: string[];
+}
+
 export function PositionSetupPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,37 +52,81 @@ export function PositionSetupPage() {
     challengePosition?: ChallengePosition;
   } | null;
   const importedPosition = state?.challengePosition;
-  const [mode, setMode] = useState<"MOVES" | "DIRECT">(
-    importedPosition && importedPosition.setupMoves.length > 0
-      ? "MOVES"
-      : "DIRECT",
+  const initialDraft: PositionEditorDraft = {
+    mode:
+      importedPosition && importedPosition.setupMoves.length > 0
+        ? "MOVES"
+        : "DIRECT",
+    fen: importedPosition?.fen ?? standardFen,
+    start:
+      importedPosition && importedPosition.setupMoves.length === 0
+        ? "CUSTOM"
+        : "STANDARD",
+    fenInput: importedPosition?.fen ?? standardFen,
+    setupMoves: importedPosition?.setupMoves ?? [],
+    setupFens: importedPosition?.setupFens ?? [],
+  };
+  const positionDraft = useSyncedDraft<PositionEditorDraft>(
+    "position-setup",
+    initialDraft,
+    { restoreExisting: !importedPosition },
   );
-  const [fen, setFen] = useState(importedPosition?.fen ?? standardFen);
-  const [start, setStart] = useState(
-    importedPosition && importedPosition.setupMoves.length === 0
-      ? "CUSTOM"
-      : "STANDARD",
-  );
+  const [mode, setMode] = useState<"MOVES" | "DIRECT">(initialDraft.mode);
+  const [fen, setFen] = useState(initialDraft.fen);
+  const [start, setStart] = useState(initialDraft.start);
   const [piece, setPiece] = useState<BoardPiece | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-  const [fenInput, setFenInput] = useState(
-    importedPosition?.fen ?? standardFen,
-  );
-  const [setupMoves, setSetupMoves] = useState(
-    importedPosition?.setupMoves ?? [],
-  );
-  const [setupFens, setSetupFens] = useState(importedPosition?.setupFens ?? []);
+  const [fenInput, setFenInput] = useState(initialDraft.fenInput);
+  const [setupMoves, setSetupMoves] = useState(initialDraft.setupMoves);
+  const [setupFens, setSetupFens] = useState(initialDraft.setupFens);
   const gameRef = useRef<Chess | null>(null);
+  const importedDraftSavedRef = useRef(false);
   const [history, setHistory] = useState<EditorHistory>({
     past: [],
     future: [],
   });
+
+  useEffect(() => {
+    if (!positionDraft.isReady || !positionDraft.restoreVersion) return;
+    if (positionDraft.hasDraft && !importedPosition) {
+      const saved = positionDraft.value;
+      setMode(saved.mode);
+      setFen(saved.fen);
+      setFenInput(saved.fenInput);
+      setStart(saved.start);
+      setSetupMoves(saved.setupMoves);
+      setSetupFens(saved.setupFens);
+      setHistory({ past: [], future: [] });
+      gameRef.current = saved.mode === "MOVES" ? new Chess(saved.fen) : null;
+    }
+  }, [
+    positionDraft.hasDraft,
+    positionDraft.isReady,
+    positionDraft.restoreVersion,
+  ]);
+
+  useEffect(() => {
+    if (
+      !importedPosition ||
+      !positionDraft.isReady ||
+      importedDraftSavedRef.current
+    )
+      return;
+    importedDraftSavedRef.current = true;
+    positionDraft.update(initialDraft);
+  }, [
+    importedPosition,
+    initialDraft,
+    positionDraft.isReady,
+    positionDraft.update,
+  ]);
 
   function snapshot(): EditorSnapshot {
     return { mode, fen, start, setupMoves, setupFens };
   }
 
   function applySnapshot(value: EditorSnapshot) {
+    positionDraft.update({ ...value, fenInput: value.fen });
     setMode(value.mode);
     setFen(value.fen);
     setFenInput(value.fen);
@@ -310,6 +365,7 @@ export function PositionSetupPage() {
             setupMoves: mode === "MOVES" ? setupMoves : [],
             setupFens: mode === "MOVES" ? setupFens : [],
           } satisfies ChallengePosition,
+          positionSetupDraft: true,
         },
       });
     } catch (error) {
@@ -342,6 +398,13 @@ export function PositionSetupPage() {
         </div>
       </header>
       <div className="panel" style={{ maxWidth: 980, marginInline: "auto" }}>
+        <DraftStatus
+          status={positionDraft.status}
+          hasDraft={positionDraft.hasDraft}
+          onClear={() => {
+            positionDraft.clear();
+          }}
+        />
         <Group justify="space-between" mb="md">
           <Text size="sm" c="dimmed">
             Choose a setup style, then build the position on the board.
@@ -422,7 +485,10 @@ export function PositionSetupPage() {
             )}
             <FenTools
               value={fenInput}
-              onChange={setFenInput}
+              onChange={(value) => {
+                setFenInput(value);
+                positionDraft.update({ ...snapshot(), fenInput: value });
+              }}
               onImport={importFen}
             />
             <Group justify="flex-end" mt="md">
