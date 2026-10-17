@@ -81,6 +81,18 @@ test("email and password registration submits and opens the sign-in step", async
   });
 });
 
+test("authenticated home stays at root and login redirects home", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.goto(`${appUrl}/`);
+  await expect(page).toHaveURL(`${appUrl}/`);
+  await expect(page.getByRole("link", { name: "Start playing" })).toBeVisible();
+
+  await page.goto(`${appUrl}/login`);
+  await expect(page).toHaveURL(`${appUrl}/`);
+});
+
 test("position editor undo and redo cover mode changes, board edits, FEN, and reset", async ({
   page,
 }) => {
@@ -148,13 +160,19 @@ test("turn settings save and reload with their stored values", async ({
     turnIndicatorEnabled: true,
     turnSoundEnabled: false,
   };
+  const oldSettings: Record<string, unknown> = { ...preferences };
+  delete oldSettings.turnIndicatorEnabled;
+  delete oldSettings.turnSoundEnabled;
+  let firstRead = true;
   await page.route("**/api/users/me/settings", async (route) => {
     if (route.request().method() === "PUT")
       stored = route.request().postDataJSON();
+    const responseSettings = firstRead ? oldSettings : stored;
+    firstRead = false;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: envelope(stored),
+      body: envelope(responseSettings),
     });
   });
   await page.route("**/api/users/me", (route) =>

@@ -51,6 +51,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const returnTo =
     safeReturnPath(searchParams.get("returnTo")) ?? peekReturnPath();
   const [submitting, setSubmitting] = useState(false);
+  const [loginSubmitted, setLoginSubmitted] = useState(false);
   const form = useForm({
     initialValues: isLogin
       ? { identifier: "", password: "" }
@@ -58,7 +59,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     validate: zodResolver(isLogin ? loginSchema : registerSchema),
   });
 
-  if (isAuthenticated)
+  if (isAuthenticated && (!isLogin || !loginSubmitted))
     return <Navigate to={isLogin ? "/" : (returnTo ?? "/play")} replace />;
 
   async function submit(values: typeof form.values) {
@@ -68,6 +69,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         const result: AuthResponse = await login(
           values as { identifier: string; password: string },
         );
+        setLoginSubmitted(true);
         signIn(result);
         const storedReturnTo = consumeReturnPath();
         const destination = returnTo ?? storedReturnTo ?? "/play";

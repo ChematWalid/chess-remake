@@ -158,8 +158,8 @@ export const userSettingsSchema = z.object({
   premovesEnabled: z.boolean(),
   moveConfirmation: z.boolean(),
   gameSoundsEnabled: z.boolean(),
-  turnIndicatorEnabled: z.boolean(),
-  turnSoundEnabled: z.boolean(),
+  turnIndicatorEnabled: z.boolean().default(true),
+  turnSoundEnabled: z.boolean().default(false),
   inAppNotificationsEnabled: z.boolean(),
   notificationSoundsEnabled: z.boolean(),
 });

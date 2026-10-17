@@ -1,8 +1,14 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 const firstUrl = process.env.E2E_FIRST_URL ?? "http://localhost:5173";
 const secondUrl = process.env.E2E_SECOND_URL ?? "http://localhost:5174";
 const apiUrl = process.env.E2E_API_URL ?? "http://localhost:8080";
+const secondApiUrl = process.env.E2E_SECOND_API_URL ?? "http://localhost:8081";
 const mailpitUrl = process.env.E2E_MAILPIT_URL ?? "http://localhost:8025";
 const customFen = "k7/8/8/8/8/8/4K3/7R w - - 0 1";
 
@@ -13,46 +19,89 @@ test("custom position challenge reaches another backend and can be accepted", as
   const suffix = Date.now().toString(36);
   const firstUsername = `flow_${suffix}_a`;
   const secondUsername = `flow_${suffix}_b`;
-  const password = process.env.E2E_PASSWORD ?? `Chess-flow-${crypto.randomUUID()}-9!`;
-  const testIp = `198.51.100.${(Date.now() % 200) + 1}`;
+  const password =
+    process.env.E2E_PASSWORD ?? `Chess-flow-${crypto.randomUUID()}-9!`;
+  const testIp = `198.51.100.${Math.floor(Math.random() * 254) + 1}`;
   const firstEmail = `flow-${suffix}-a@example.test`;
   const secondEmail = `flow-${suffix}-b@example.test`;
   await registerAndVerify(request, firstUsername, firstEmail, password, testIp);
-  await registerAndVerify(request, secondUsername, secondEmail, password, testIp);
+  await registerAndVerify(
+    request,
+    secondUsername,
+    secondEmail,
+    password,
+    testIp,
+  );
   const firstToken = await login(request, firstUsername, password, testIp);
   const secondToken = await login(request, secondUsername, password, testIp);
-  await ensureFriends(request, firstToken, secondToken, firstUsername, secondUsername);
+  await ensureFriends(
+    request,
+    firstToken,
+    secondToken,
+    firstUsername,
+    secondUsername,
+  );
 
   const firstContext = await browser.newContext({ baseURL: firstUrl });
   const secondContext = await browser.newContext({ baseURL: secondUrl });
   const firstPage = await firstContext.newPage();
   const secondPage = await secondContext.newPage();
   try {
-    await signIn(firstPage, firstUrl, firstUsername, password, testIp);
-    await signIn(secondPage, secondUrl, secondUsername, password, testIp);
-    await secondPage.goto(`${secondUrl}/play`);
+    await signIn(firstPage, firstUrl, firstUsername, password);
+    await signIn(secondPage, secondUrl, secondUsername, password);
+    await secondPage.getByRole("link", { name: "Play", exact: true }).click();
+    await expect(
+      secondPage.getByRole("heading", { name: "Play chess" }),
+    ).toBeVisible();
+    await expect(secondPage.getByText("● Connected")).toBeVisible();
+    await expect
+      .poll(async () => {
+        const response = await request.get(`${apiUrl}/api/friends`, {
+          headers: { Authorization: `Bearer ${firstToken}` },
+          timeout: 5_000,
+        });
+        if (!response.ok()) return "ERROR";
+        const json = await response.json();
+        const friends = json.data ?? json;
+        return friends.find(
+          (friend: { username: string }) => friend.username === secondUsername,
+        )?.presence;
+      })
+      .toBe("ONLINE");
 
-    await firstPage.goto(`${firstUrl}/position-setup`);
+    await firstPage.getByRole("link", { name: "Play", exact: true }).click();
+    await firstPage
+      .getByRole("combobox", { name: "Starting position" })
+      .click();
+    await firstPage.getByRole("option", { name: "Custom position" }).click();
+    await firstPage.getByRole("button", { name: "Set up position" }).click();
     await firstPage.getByLabel("FEN import or export").fill(customFen);
     await firstPage.getByRole("button", { name: "Import FEN" }).click();
     await firstPage.getByRole("button", { name: "Use this position" }).click();
     await expect(firstPage).toHaveURL(/\/play$/);
     await firstPage.getByRole("combobox", { name: "Friend" }).click();
-    await firstPage.getByRole("option", { name: new RegExp(secondUsername!, "i") }).click();
+    await firstPage
+      .getByRole("option", { name: new RegExp(secondUsername!, "i") })
+      .click();
     await firstPage.getByRole("combobox", { name: "Play as" }).click();
     await firstPage.getByRole("option", { name: "White" }).click();
     await firstPage.getByRole("button", { name: "Send challenge" }).click();
 
-    const invitation = secondPage.locator(".challenge-row").filter({ hasText: firstUsername! });
+    const invitation = secondPage
+      .locator(".challenge-row")
+      .filter({ hasText: firstUsername! });
     await expect(invitation).toBeVisible();
     await invitation.getByRole("button", { name: "Accept" }).click();
     await expect(firstPage).toHaveURL(/\/game\/\d+/);
     await expect(secondPage).toHaveURL(/\/game\/\d+/);
 
     const firstChallengeId = Number(firstPage.url().split("/").at(-1));
-    const detail = await request.get(`${apiUrl}/api/challenges/${firstChallengeId}`, {
-      headers: { Authorization: `Bearer ${firstToken}` },
-    });
+    const detail = await request.get(
+      `${apiUrl}/api/challenges/${firstChallengeId}`,
+      {
+        headers: { Authorization: `Bearer ${firstToken}` },
+      },
+    );
     expect(detail.ok()).toBeTruthy();
     const response = await detail.json();
     const challenge = response.data ?? response;
@@ -60,7 +109,8 @@ test("custom position challenge reaches another backend and can be accepted", as
     expect(challenge.challengerSide).toBe("WHITE");
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      const rejected = await request.post(`${apiUrl}/api/auth/login`, {
+      const endpoint = attempt % 2 === 0 ? apiUrl : secondApiUrl;
+      const rejected = await request.post(`${endpoint}/api/auth/login`, {
         data: { identifier: firstUsername, password: "incorrect-password" },
         headers: { "X-Forwarded-For": testIp },
       });
@@ -93,27 +143,44 @@ async function registerAndVerify(
   let token = "";
   const deadline = Date.now() + 20_000;
   while (!token && Date.now() < deadline) {
-    const messagesResponse = await request.get(`${mailpitUrl}/api/v1/messages?limit=50`);
+    const messagesResponse = await request.get(
+      `${mailpitUrl}/api/v1/messages?limit=50`,
+    );
     expect(messagesResponse.ok()).toBeTruthy();
     const messagesJson = await messagesResponse.json();
     const messages = messagesJson.messages ?? [];
-    const message = messages.find((item: { To?: Array<{ Address: string }>; ID: string }) =>
-      item.To?.some((recipient) => recipient.Address === email),
+    const message = messages.find(
+      (item: { To?: Array<{ Address: string }>; ID: string }) =>
+        item.To?.some((recipient) => recipient.Address === email),
     );
     if (message) {
-      const detailResponse = await request.get(`${mailpitUrl}/api/v1/message/${message.ID}`);
+      const detailResponse = await request.get(
+        `${mailpitUrl}/api/v1/message/${message.ID}`,
+      );
       const detail = await detailResponse.json();
       const content = `${detail.Text ?? ""} ${detail.HTML ?? ""}`;
       token = content.match(/verify-email\?token=([A-Za-z0-9_-]+)/)?.[1] ?? "";
     }
     if (!token) await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  expect(token, `Verification email was not received for ${username}`).not.toBe("");
-  const verified = await request.post(`${apiUrl}/api/auth/verify-email`, { data: { token } });
-  expect(verified.ok()).toBeTruthy();
+  expect(token, `Verification email was not received for ${username}`).not.toBe(
+    "",
+  );
+  const verified = await request.post(`${apiUrl}/api/auth/verify-email`, {
+    data: { token },
+  });
+  expect(
+    verified.ok(),
+    `Email verification failed (${verified.status()}): ${await verified.text()}`,
+  ).toBeTruthy();
 }
 
-async function login(request: APIRequestContext, username: string, password: string, testIp: string) {
+async function login(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+  testIp: string,
+) {
   const response = await request.post(`${apiUrl}/api/auth/login`, {
     data: { identifier: username, password },
     headers: { "X-Forwarded-For": testIp },
@@ -136,42 +203,81 @@ async function ensureFriends(
   expect(existing.ok()).toBeTruthy();
   const friendJson = await existing.json();
   const friends = friendJson.data ?? friendJson;
-  if (friends.some((friend: { username: string }) => friend.username === secondUsername)) return;
+  if (
+    friends.some(
+      (friend: { username: string }) => friend.username === secondUsername,
+    )
+  )
+    return;
 
-  const requestResponse = await request.post(`${apiUrl}/api/friends/request/${encodeURIComponent(secondUsername)}`, {
-    headers: { Authorization: `Bearer ${firstToken}` },
-  });
-  if (!requestResponse.ok()) {
-    const outgoingResponse = await request.get(`${apiUrl}/api/friends/requests/outgoing`, {
+  const requestResponse = await request.post(
+    `${apiUrl}/api/friends/request/${encodeURIComponent(secondUsername)}`,
+    {
       headers: { Authorization: `Bearer ${firstToken}` },
-    });
+    },
+  );
+  if (!requestResponse.ok()) {
+    const outgoingResponse = await request.get(
+      `${apiUrl}/api/friends/requests/outgoing`,
+      {
+        headers: { Authorization: `Bearer ${firstToken}` },
+      },
+    );
     const outgoingJson = await outgoingResponse.json();
     const outgoing = outgoingJson.data ?? outgoingJson;
-    if ((Array.isArray(outgoing) ? outgoing : outgoing.items).some(
-      (item: { username: string; status: string }) => item.username === secondUsername && item.status === "PENDING",
-    )) throw new Error("A pending friend request already exists; accept it before running this browser flow");
+    if (
+      (Array.isArray(outgoing) ? outgoing : outgoing.items).some(
+        (item: { username: string; status: string }) =>
+          item.username === secondUsername && item.status === "PENDING",
+      )
+    )
+      throw new Error(
+        "A pending friend request already exists; accept it before running this browser flow",
+      );
   }
-  const incomingResponse = await request.get(`${apiUrl}/api/friends/requests/incoming`, {
-    headers: { Authorization: `Bearer ${secondToken}` },
-  });
+  const incomingResponse = await request.get(
+    `${apiUrl}/api/friends/requests/incoming`,
+    {
+      headers: { Authorization: `Bearer ${secondToken}` },
+    },
+  );
   expect(incomingResponse.ok()).toBeTruthy();
   const json = await incomingResponse.json();
   const requests = json.data ?? json;
   const incoming = Array.isArray(requests) ? requests : requests.items;
-  const match = incoming.find((item: { username: string }) => item.username === firstUsername);
+  const match = incoming.find(
+    (item: { username: string }) => item.username === firstUsername,
+  );
   if (match) {
-    const acceptResponse = await request.post(`${apiUrl}/api/friends/accept/${match.requestId}`, {
-      headers: { Authorization: `Bearer ${secondToken}` },
-    });
+    const acceptResponse = await request.post(
+      `${apiUrl}/api/friends/accept/${match.requestId}`,
+      {
+        headers: { Authorization: `Bearer ${secondToken}` },
+      },
+    );
     expect(acceptResponse.ok()).toBeTruthy();
   }
 }
 
-async function signIn(page: Page, baseUrl: string, username: string, password: string, testIp: string) {
-  await page.setExtraHTTPHeaders({ "X-Forwarded-For": testIp });
+async function signIn(
+  page: Page,
+  baseUrl: string,
+  username: string,
+  password: string,
+) {
   await page.goto(`${baseUrl}/login`);
   await page.getByLabel("Username or email").fill(username);
   await page.getByRole("textbox", { name: "Password" }).fill(password);
+  const loginResponsePromise = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/auth/login" &&
+      response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Sign in" }).click();
+  const loginResponse = await loginResponsePromise;
+  expect(loginResponse.status(), await loginResponse.text()).toBe(200);
   await expect(page).toHaveURL(/\/(play)?$/);
+  await expect
+    .poll(() => page.evaluate(() => sessionStorage.getItem("chess.user")))
+    .not.toBeNull();
 }

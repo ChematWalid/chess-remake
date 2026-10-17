@@ -5,6 +5,7 @@ import { useAuth } from "../shared/auth/AuthProvider";
 import { RealtimeProvider } from "../features/realtime/RealtimeProvider";
 import { useRealtime } from "../features/realtime/RealtimeContext";
 import { challengeEventSchema } from "../shared/api/types";
+import { AppLoading } from "../shared/components/AppLoading";
 
 function AssignedGameNavigator() {
   const { subscribe } = useRealtime();
@@ -94,29 +95,21 @@ const InvitePage = lazy(() =>
 
 function RequireAuth() {
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading)
-    return <main className="public-loading">Restoring your session…</main>;
+  if (isLoading) return <AppLoading label="Restoring your session" />;
   return isAuthenticated ? <AppShell /> : <Navigate to="/login" replace />;
 }
 
 function LoginRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading)
-    return <main className="public-loading">Restoring your session…</main>;
-  return isAuthenticated ? (
-    <Navigate to="/" replace />
-  ) : (
-    <AuthPage mode="login" />
-  );
+  const { isLoading } = useAuth();
+  if (isLoading) return <AppLoading label="Restoring your session" />;
+  return <AuthPage mode="login" />;
 }
 
 export function AppRoutes() {
   return (
     <RealtimeProvider>
       <AssignedGameNavigator />
-      <Suspense
-        fallback={<main className="public-loading">Loading page…</main>}
-      >
+      <Suspense fallback={<AppLoading label="Getting things ready" />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginRoute />} />
