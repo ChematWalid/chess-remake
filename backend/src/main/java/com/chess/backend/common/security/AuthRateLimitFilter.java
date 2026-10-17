@@ -81,7 +81,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private boolean allow(String identity, int limit, Duration window) {
         if (limit < 1) return true;
         String key = "chess:rate-limit:" + digest(identity);
-        Long count = redis.execute(INCREMENT, List.of(key), window.toMillis());
+        Long count = redis.execute(INCREMENT, List.of(key), Long.toString(window.toMillis()));
         if (count == null) {
             throw new DataAccessResourceFailureException("Redis did not return a rate limit count");
         }

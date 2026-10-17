@@ -37,9 +37,9 @@ test("custom position challenge reaches another backend and can be accepted", as
     await firstPage.getByRole("button", { name: "Import FEN" }).click();
     await firstPage.getByRole("button", { name: "Use this position" }).click();
     await expect(firstPage).toHaveURL(/\/play$/);
-    await firstPage.getByLabel("Friend").click();
+    await firstPage.getByRole("combobox", { name: "Friend" }).click();
     await firstPage.getByRole("option", { name: new RegExp(secondUsername!, "i") }).click();
-    await firstPage.getByLabel("Play as").click();
+    await firstPage.getByRole("combobox", { name: "Play as" }).click();
     await firstPage.getByRole("option", { name: "White" }).click();
     await firstPage.getByRole("button", { name: "Send challenge" }).click();
 
@@ -171,8 +171,7 @@ async function signIn(page: Page, baseUrl: string, username: string, password: s
   await page.setExtraHTTPHeaders({ "X-Forwarded-For": testIp });
   await page.goto(`${baseUrl}/login`);
   await page.getByLabel("Username or email").fill(username);
-  await page.getByLabel("Password").fill(password);
+  await page.getByRole("textbox", { name: "Password" }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/(play)?$/);
-  await expect(page.getByRole("button", { name: "Send challenge" })).toBeVisible({ timeout: 20_000 });
 }

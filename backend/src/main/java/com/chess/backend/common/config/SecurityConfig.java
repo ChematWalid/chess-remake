@@ -20,6 +20,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -72,8 +73,8 @@ public class SecurityConfig {
                         }))
                 .oauth2Login(oauth -> oauth.successHandler(oAuthSuccessHandler).failureHandler(oAuthSuccessHandler))
                 .addFilterBefore(new RefreshCookieOriginFilter(properties, objectMapper), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(authRateLimitFilter, AuthorizationFilter.class)
                 .build();
     }
 

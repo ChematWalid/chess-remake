@@ -48,18 +48,19 @@ public class RedisPresenceStore {
 
     public boolean addOrRefresh(long userId, String sessionId) {
         long now = clock.millis();
-        Long count = redis.execute(UPSERT_SESSION, List.of(key(userId)), now,
-                now + SESSION_LEASE.toMillis(), sessionId, SESSION_LEASE.plusSeconds(15).toSeconds());
+        Long count = redis.execute(UPSERT_SESSION, List.of(key(userId)), Long.toString(now),
+                Long.toString(now + SESSION_LEASE.toMillis()), sessionId,
+                Long.toString(SESSION_LEASE.plusSeconds(15).toSeconds()));
         return count != null && count == 1;
     }
 
     public boolean remove(long userId, String sessionId) {
-        Long count = redis.execute(REMOVE_SESSION, List.of(key(userId)), clock.millis(), sessionId);
+        Long count = redis.execute(REMOVE_SESSION, List.of(key(userId)), Long.toString(clock.millis()), sessionId);
         return count != null && count == 0;
     }
 
     public boolean isOnline(long userId) {
-        Long count = redis.execute(SESSION_COUNT, List.of(key(userId)), clock.millis());
+        Long count = redis.execute(SESSION_COUNT, List.of(key(userId)), Long.toString(clock.millis()));
         return count != null && count > 0;
     }
 
