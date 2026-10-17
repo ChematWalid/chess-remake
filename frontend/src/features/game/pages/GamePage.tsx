@@ -16,6 +16,10 @@ import { getMyProfile, getProfile, getSettings } from "../../user/api/userApi";
 import { ChessBoard } from "../components/ChessBoard";
 import { GamePlayerIdentity } from "../components/GamePlayerIdentity";
 import { GameMovesPanel } from "../components/GameMovesPanel";
+import {
+  GameResultDialog,
+  type GameSide,
+} from "../components/GameResultDialog";
 import { MoveDialogs, type PendingMove } from "../components/MoveDialogs";
 import { playUiTone } from "../../../shared/utils/playUiTone";
 import { resolveEngineUrl } from "../utils/resolveEngineUrl";
@@ -30,6 +34,7 @@ interface EngineEvent {
   white_time_ms?: number;
   black_time_ms?: number;
   result?: string;
+  winner?: GameSide | null;
   reason?: string;
   message?: string;
   color?: "white" | "black";
@@ -57,6 +62,8 @@ function projectPremove(
   const sourceRank = Number(move.from[1]);
   const destinationRank = Number(move.to[1]);
   const isPawn = piece.type === "p";
+  const isPromotion =
+    isPawn && (destinationRank === 1 || destinationRank === 8);
   const isCastling =
     piece.type === "k" && Math.abs(sourceFile - destinationFile) === 2;
   const isEnPassant = isPawn && sourceFile !== destinationFile && !captured;
@@ -71,7 +78,10 @@ function projectPremove(
 
   if (
     !game.put(
-      { color: piece.color, type: move.promotion ?? piece.type },
+      {
+        color: piece.color,
+        type: move.promotion ?? (isPromotion ? "q" : piece.type),
+      },
       move.to,
     )
   ) {
@@ -90,6 +100,18 @@ function projectPremove(
   return true;
 }
 
+function isLegalPremove(
+  fen: string,
+  move: PendingMove,
+  color: "white" | "black",
+): boolean {
+  const game = new Chess(undefined, { skipValidation: true });
+  game.load(fenForTurn(fen, color), { skipValidation: true });
+  return game
+    .moves({ square: move.from, verbose: true })
+    .some((candidate) => candidate.to === move.to);
+}
+
 export function GamePage({ live = false }: { live?: boolean }) {
   const { id = "0", challengeId = "0" } = useParams();
   const { user } = useAuth();
@@ -102,6 +124,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const [color, setColor] = useState<"white" | "black">("white");
   const [connected, setConnected] = useState(false);
   const [finished, setFinished] = useState<string | null>(null);
+  const [gameResult, setGameResult] = useState<{
+    winnerSide: GameSide | null;
+    reason: string;
+  } | null>(null);
   const [drawOfferedBy, setDrawOfferedBy] = useState<"white" | "black" | null>(
     null,
   );
@@ -265,6 +291,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
                 ? `${event.result ?? "Game over"} · ${event.reason}`
                 : (event.result ?? "Game over"),
             );
+            setGameResult({
+              winnerSide: event.winner ?? null,
+              reason: event.reason ?? "the game rules",
+            });
             updatePremoves([]);
           } else if (event.event === "draw_offered") {
             setDrawOfferedBy(event.color ?? null);
@@ -414,7 +444,12 @@ export function GamePage({ live = false }: { live?: boolean }) {
     if (!live || !premoves.length) return currentFen;
     const projection = new Chess(currentFen);
     for (const move of premoves) {
-      if (!projectPremove(projection, move, color)) break;
+      if (
+        !isLegalPremove(projection.fen(), move, color) ||
+        !projectPremove(projection, move, color)
+      ) {
+        break;
+      }
     }
     return projection.fen();
   }, [live, premoves, currentFen, color]);
@@ -452,6 +487,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
     try {
       const game = new Chess(position);
+      if (game.turn() !== (color === "white" ? "w" : "b")) return false;
       const applied = game.move({
         from: move.from,
         to: move.to,
@@ -461,7 +497,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       ws.send(
         JSON.stringify({
           action: "move",
-          uci: `${move.from}${move.to}${move.promotion ?? ""}`,
+          uci: `${move.from}${move.to}${move.promotion ?? applied.promotion ?? ""}`,
         }),
       );
       return true;
@@ -492,9 +528,26 @@ export function GamePage({ live = false }: { live?: boolean }) {
     const game = new Chess(currentFen);
     if (turn !== (color === "white" ? "w" : "b")) {
       if (prefs.premovesEnabled) {
+        const move = { from, to };
+        if (!isLegalPremove(displayedFen, move, color)) {
+          notifications.show({
+            title: "Premove not queued",
+            message: "That move is not legal from the planned position.",
+            color: "yellow",
+          });
+          setSelected(null);
+          return;
+        }
+        const plannedGame = new Chess(undefined, { skipValidation: true });
+        plannedGame.load(fenForTurn(displayedFen, color), {
+          skipValidation: true,
+        });
+        const promotes = plannedGame
+          .moves({ square: from, verbose: true })
+          .some((candidate) => candidate.to === to && candidate.promotion);
         const nextPremoves = [
           ...livePreferences.current.premoves,
-          { from, to },
+          { from, to, ...(promotes ? { promotion: "q" as const } : {}) },
         ];
         updatePremoves(nextPremoves);
         setSelected(null);
@@ -730,6 +783,17 @@ export function GamePage({ live = false }: { live?: boolean }) {
           onPlayingChange={setPlaying}
         />
       </div>
+      {live && gameResult && (
+        <GameResultDialog
+          opened
+          winnerSide={gameResult.winnerSide}
+          viewerSide={color}
+          reason={gameResult.reason}
+          whitePlayer={whitePlayer}
+          blackPlayer={blackPlayer}
+          onClose={() => setGameResult(null)}
+        />
+      )}
       <MoveDialogs
         promotion={promotion}
         pending={pending}
