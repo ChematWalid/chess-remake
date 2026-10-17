@@ -1,14 +1,6 @@
-import {
-  Anchor,
-  Badge,
-  Group,
-  Pagination,
-  Stack,
-  Table,
-  Text,
-} from "@mantine/core";
+import { Group, Pagination, Stack, Table, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   EmptyState,
   ErrorState,
@@ -16,12 +8,14 @@ import {
 } from "../../../shared/components/PageState";
 import { getMyGames, getPlayerGames } from "../../game/api/gameApi";
 import { useAuth } from "../../../shared/auth/AuthProvider";
+import { GameHistoryRow } from "../components/GameHistoryRow";
 
 export function HistoryPage() {
   const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   const page = Math.max(0, Number(params.get("page") ?? 0));
   const playerId = params.get("player");
+  const viewedPlayerId = playerId ?? user?.publicId ?? null;
   const history = useQuery({
     queryKey: ["my-history", playerId ?? user?.publicId, page],
     queryFn: () =>
@@ -62,33 +56,11 @@ export function HistoryPage() {
               </Table.Thead>
               <Table.Tbody>
                 {history.data.items.map((game) => (
-                  <Table.Tr key={game.id}>
-                    <Table.Td>{game.whiteUsername}</Table.Td>
-                    <Table.Td>{game.blackUsername}</Table.Td>
-                    <Table.Td>
-                      <Badge
-                        color={game.draw ? "gray" : "green"}
-                        variant="light"
-                      >
-                        {game.draw
-                          ? "Draw"
-                          : game.winnerPublicUserId === game.whitePublicUserId
-                            ? "White won"
-                            : "Black won"}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{game.totalMoves}</Table.Td>
-                    <Table.Td>
-                      <Text size="sm" c="dimmed">
-                        {new Date(game.playedAt).toLocaleDateString()}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Anchor component={Link} to={`/games/${game.id}`}>
-                        Review
-                      </Anchor>
-                    </Table.Td>
-                  </Table.Tr>
+                  <GameHistoryRow
+                    key={game.id}
+                    game={game}
+                    viewedPlayerId={viewedPlayerId}
+                  />
                 ))}
               </Table.Tbody>
             </Table>
