@@ -56,6 +56,7 @@ TEST(WebSocketServerTest, ClosesConnectionAfterOversizedMessage) {
     bool closed = false;
 
     ix::WebSocket client;
+    client.disableAutomaticReconnection();
     client.setUrl("ws://127.0.0.1:" + std::to_string(port) + "/ws/play");
     client.setOnMessageCallback([&](const ix::WebSocketMessagePtr& message) {
         std::lock_guard<std::mutex> lock(mutex);
@@ -73,27 +74,34 @@ TEST(WebSocketServerTest, ClosesConnectionAfterOversizedMessage) {
     });
     client.start();
 
+    bool openedInTime = false;
     {
         std::unique_lock<std::mutex> lock(mutex);
-        ASSERT_TRUE(condition.wait_for(lock, std::chrono::seconds(3), [&] { return opened; }));
+        openedInTime = condition.wait_for(lock, std::chrono::seconds(3), [&] { return opened; });
     }
 
-    client.sendText("{}");
-
-    {
+    bool normalRequestStayedOpen = false;
+    if (openedInTime) {
+        client.sendText("{}");
         std::unique_lock<std::mutex> lock(mutex);
-        ASSERT_TRUE(condition.wait_for(lock, std::chrono::seconds(3), [&] { return receivedNormalError; }));
-        EXPECT_FALSE(closed);
+        condition.wait_for(lock, std::chrono::seconds(3), [&] { return receivedNormalError || closed; });
+        normalRequestStayedOpen = receivedNormalError && !closed;
     }
 
-    client.sendText(std::string(net::WebSocketServer::kMaxIncomingMessageSize + 1, 'x'));
+    bool closedInTime = false;
+    if (openedInTime) {
+        client.sendText(std::string(net::WebSocketServer::kMaxIncomingMessageSize + 1, 'x'));
 
-    {
         std::unique_lock<std::mutex> lock(mutex);
-        EXPECT_TRUE(condition.wait_for(lock, std::chrono::seconds(3), [&] { return closed; }));
-        EXPECT_TRUE(receivedSizeError);
+        closedInTime = condition.wait_for(lock, std::chrono::seconds(3), [&] {
+            return closed && receivedSizeError;
+        });
     }
 
     client.stop();
     server.stop();
+
+    EXPECT_TRUE(openedInTime);
+    EXPECT_TRUE(normalRequestStayedOpen);
+    EXPECT_TRUE(closedInTime);
 }
