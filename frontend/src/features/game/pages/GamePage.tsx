@@ -36,7 +36,56 @@ interface EngineEvent {
 function fenForTurn(fen: string, color: "white" | "black"): string {
   const fields = fen.split(" ");
   fields[1] = color === "white" ? "w" : "b";
+  fields[3] = "-";
   return fields.join(" ");
+}
+
+function projectPremove(
+  game: Chess,
+  move: PendingMove,
+  color: "white" | "black",
+): boolean {
+  const piece = game.get(move.from);
+  const captured = game.get(move.to);
+  if (!piece || piece.color !== color[0] || captured?.type === "k")
+    return false;
+
+  const sourceFile = move.from.charCodeAt(0);
+  const destinationFile = move.to.charCodeAt(0);
+  const sourceRank = Number(move.from[1]);
+  const destinationRank = Number(move.to[1]);
+  const isPawn = piece.type === "p";
+  const isCastling =
+    piece.type === "k" && Math.abs(sourceFile - destinationFile) === 2;
+  const isEnPassant = isPawn && sourceFile !== destinationFile && !captured;
+
+  if (isEnPassant) {
+    const capturedSquare =
+      `${move.to[0]}${destinationRank + (color === "white" ? -1 : 1)}` as Square;
+    game.remove(capturedSquare);
+  }
+  game.remove(move.from);
+  game.remove(move.to);
+
+  if (
+    !game.put(
+      { color: piece.color, type: move.promotion ?? piece.type },
+      move.to,
+    )
+  ) {
+    return false;
+  }
+
+  if (isCastling) {
+    const rookFrom =
+      `${destinationFile > sourceFile ? "h" : "a"}${sourceRank}` as Square;
+    const rookTo =
+      `${destinationFile > sourceFile ? "f" : "d"}${sourceRank}` as Square;
+    const rook = game.remove(rookFrom);
+    if (rook) game.put(rook, rookTo);
+  }
+
+  return true;
 }
 
 export function GamePage({ live = false }: { live?: boolean }) {
@@ -312,21 +361,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
       : fen;
   const displayedFen = useMemo(() => {
     if (!live || !premoves.length) return currentFen;
-    let projection = currentFen;
+    const projection = new Chess(currentFen);
     for (const move of premoves) {
-      try {
-        const projectedGame = new Chess(fenForTurn(projection, color));
-        projectedGame.move({
-          from: move.from,
-          to: move.to,
-          promotion: move.promotion ?? "q",
-        });
-        projection = projectedGame.fen();
-      } catch {
-        break;
-      }
+      if (!projectPremove(projection, move, color)) break;
     }
-    return projection;
+    return projection.fen();
   }, [live, premoves, currentFen, color]);
   const turn = useMemo(() => {
     try {
@@ -342,11 +381,17 @@ export function GamePage({ live = false }: { live?: boolean }) {
       : (prefs.boardOrientation.toLowerCase() as "white" | "black");
   const legalTargets =
     selected && prefs.showLegalMoveHints
-      ? new Chess(
-          live && turn !== (color === "white" ? "w" : "b")
-            ? fenForTurn(displayedFen, color)
-            : displayedFen,
-        )
+      ? (() => {
+          const game = new Chess(undefined, { skipValidation: true });
+          if (live && turn !== (color === "white" ? "w" : "b")) {
+            game.load(fenForTurn(displayedFen, color), {
+              skipValidation: true,
+            });
+          } else {
+            game.load(displayedFen, { skipValidation: true });
+          }
+          return game;
+        })()
           .moves({ square: selected, verbose: true })
           .map((move) => move.to)
       : [];
