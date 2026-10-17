@@ -21,6 +21,6 @@ public class GameSavedNotificationListener {
         UserNotification notification = new UserNotification(NotificationType.GAME_SAVED,
                 Long.toString(event.gameId()));
         List.of(event.whitePlayerId(), event.blackPlayerId()).forEach(userId ->
-                messaging.convertAndSendToUser(Long.toString(userId), "/queue/notifications", notification));
+                messaging.convertAndSendToUser(Long.toString(userId), "/topic/notifications", notification));
     }
 }

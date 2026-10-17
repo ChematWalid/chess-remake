@@ -7,7 +7,7 @@ The Hoppscotch MCP HTTP executor does not create or execute WebSocket sessions. 
 - Endpoint: `http://localhost:8080/ws` (SockJS enabled; WebSocket transport path is `/ws/{server-id}/{session-id}/websocket`).
 - Set the WebSocket Origin to the configured frontend origin (`APP_CORS_ORIGINS` in the ignored local `.env`, normally `http://localhost:5173`).
 - On STOMP `CONNECT`, send `accept-version:1.2`, `host:localhost`, and `Authorization:Bearer <access token>`.
-- Subscribe as each authenticated user to `/user/queue/challenges`, `/user/queue/notifications`, `/user/queue/errors`, and (for friend presence) `/topic/presence`.
+- Subscribe as each authenticated user to `/user/topic/challenges`, `/user/topic/notifications`, `/user/topic/errors`, and `/user/topic/presence`.
 - A SockJS transport wraps outgoing STOMP frames as a JSON array of strings and sends server frames as `a["<STOMP frame>"]`. Terminate each STOMP frame with NUL (`\\u0000`).
 
 ### Challenge success flow
@@ -18,7 +18,7 @@ As White, send to `/app/challenge.send`:
 {"toUsername":"<blackUsername>","challengerSide":"WHITE","initialTimeSeconds":300,"incrementSeconds":0}
 ```
 
-Black receives an `INVITATION_RECEIVED` event at `/user/queue/challenges`; White receives `INVITATION_SENT`. Black then sends to `/app/challenge.accept`:
+Black receives an `INVITATION_RECEIVED` event at `/user/topic/challenges`; White receives `INVITATION_SENT`. Black then sends to `/app/challenge.accept`:
 
 ```json
 {"challengeId":<challengeId>}
@@ -30,12 +30,12 @@ If both players have not connected and started the game within `APP_GAME_START_T
 
 ### Challenge lifecycle and error probes
 
-- Send a valid request with a non-friend username: expect `CHALLENGE_REQUIRES_FRIEND` on `/user/queue/errors`, with the STOMP connection kept open.
-- Challenge own username: expect `SELF_CHALLENGE` on `/user/queue/errors`.
+- Send a valid request with a non-friend username: expect `CHALLENGE_REQUIRES_FRIEND` on `/user/topic/errors`, with the STOMP connection kept open.
+- Challenge own username: expect `SELF_CHALLENGE` on `/user/topic/errors`.
 - Send `initialTimeSeconds:4`, negative increment, or only one of the two clock values: expect a typed validation/time-control error.
 - Send the same challenge twice before resolving it: expect `CHALLENGE_ALREADY_PENDING`.
 - Accept as a non-recipient, accept an unknown ID, and accept after decline/cancel: expect `CHALLENGE_NOT_FOUND`/unavailable typed errors; socket remains usable.
-- Try malformed JSON and `challengeId:0`; expect a validation/protocol error on `/user/queue/errors`, without disconnecting.
+- Try malformed JSON and `challengeId:0`; expect a validation/protocol error on `/user/topic/errors`, without disconnecting.
 - Test decline (`/app/challenge.decline`) and cancel (`/app/challenge.cancel`) using `{"challengeId":<challengeId>}`. The recipient may decline; only the challenger may cancel. Verify both parties receive the final status event and the REST incoming/outgoing queues no longer list it as pending.
 - Connect with a missing, expired, malformed, or wrong-user JWT. STOMP authentication must fail without exposing exception details. Subscribe or send before CONNECT/authentication and verify it is rejected.
 

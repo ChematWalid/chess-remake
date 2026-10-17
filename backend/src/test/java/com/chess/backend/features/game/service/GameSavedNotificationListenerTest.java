@@ -19,9 +19,9 @@ class GameSavedNotificationListenerTest {
 
         listener.gameRecorded(new GameRecordedEvent(57, 11, 12));
 
-        verify(messaging).convertAndSendToUser(eq("11"), eq("/queue/notifications"),
+        verify(messaging).convertAndSendToUser(eq("11"), eq("/topic/notifications"),
                 argThat(payload -> isGameSavedNotification(payload, "57")));
-        verify(messaging).convertAndSendToUser(eq("12"), eq("/queue/notifications"),
+        verify(messaging).convertAndSendToUser(eq("12"), eq("/topic/notifications"),
                 argThat(payload -> isGameSavedNotification(payload, "57")));
     }
 

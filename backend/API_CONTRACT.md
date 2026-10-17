@@ -4,6 +4,8 @@ The REST API is described by OpenAPI at `/v3/api-docs` and the interactive Swagg
 
 ## REST conventions
 
+Public authentication POST requests use distributed Redis rate limits. Limits use the client IP, and selected operations also use a SHA-256 hash of the submitted account identifier or one-time token. Login allows 20 attempts per IP and 8 per identifier in 15 minutes; registration allows 5 requests per IP per hour; verification and password recovery allow 15 requests per IP and 5 per identifier per hour. OAuth code exchange allows 20 requests per IP and 8 per code in 15 minutes. A limit response is `429 AUTH_RATE_LIMITED` with `Retry-After`. If Redis is unavailable, these endpoints return `503 AUTH_RATE_LIMIT_UNAVAILABLE` rather than accepting unbounded attempts.
+
 - Send `Authorization: Bearer <accessToken>` on protected requests. Access tokens expire after the configured access-token lifetime.
 - JSON success responses use `{ "success": true, "code": 200, "message": "Success", "data": ... }`. Error responses use the same envelope with `success: false`, `errorCode`, and a safe message. Validation errors also include an `errors` object.
 - `POST /api/auth/login` and token refresh return an access token in the JSON data and set the refresh token in the `HttpOnly` `chess_refresh` cookie. Send cookies with credentials enabled. Refresh and logout use that cookie; logout revokes it and returns `204`.
@@ -58,13 +60,13 @@ Google OAuth starts at `/oauth2/authorization/google`. The backend redirects to 
 ## STOMP, presence, and challenges
 
 - Connect to `/ws` using STOMP (SockJS fallback is enabled). Include `Authorization: Bearer <accessToken>` in the STOMP `CONNECT` frame.
-- Subscribe only to user destinations: `/user/queue/presence`, `/user/queue/challenges`, `/user/queue/notifications`, and `/user/queue/errors`.
+- Subscribe only to user destinations: `/user/topic/presence`, `/user/topic/challenges`, `/user/topic/notifications`, and `/user/topic/errors`.
 - Send commands under `/app`: `/app/challenge.send` with `toUsername`, optional `challengerSide` (`WHITE`, `BLACK`, `RANDOM`), and optional paired `initialTimeSeconds` / `incrementSeconds`; `/app/challenge.accept`, `/app/challenge.decline`, and `/app/challenge.cancel` each take `{ "challengeId": 123 }`.
 - Challenge events include an event type, challenge ID/status, opaque actor public ID, optional challenger identity and clock settings, then assigned room code, color, connect URL, player-specific engine JWT, or status message as applicable. The sender receives an `INVITATION_SENT` event with its challenge ID; the opponent receives `INVITATION_RECEIVED`.
 - On reconnect, use the incoming/outgoing challenge endpoints to reconcile state. `GET /api/challenges/{challengeId}` returns fresh caller-specific connection credentials only while the challenge is accepted.
-- Presence events use `{ "publicUserId": "uuid", "status": "ONLINE|IN_GAME|OFFLINE" }` and are sent to each accepted friend’s `/user/queue/presence` destination.
-- Challenge command failures are sent to `/user/queue/errors` as `{ "errorCode": "...", "message": "..." }`; the STOMP connection remains available.
-- Friend-request received/accepted/declined and game-saved notices are sent to `/user/queue/notifications`. Their subject user IDs are opaque UUIDs; a game-saved subject is the game-history ID.
+- Presence events use `{ "publicUserId": "uuid", "status": "ONLINE|IN_GAME|OFFLINE|UNKNOWN" }` and are sent to each accepted friend’s `/user/topic/presence` destination.
+- Challenge command failures are sent to `/user/topic/errors` as `{ "errorCode": "...", "message": "..." }`; the STOMP connection remains available.
+- Friend-request received/accepted/declined and game-saved notices are sent to `/user/topic/notifications`. Their subject user IDs are opaque UUIDs; a game-saved subject is the game-history ID.
 
 ## C++ live-game and webhook contract
 

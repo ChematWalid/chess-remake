@@ -19,7 +19,8 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final Set<String> ALLOWED_SEND_DESTINATIONS = Set.of(
             "/app/challenge.send", "/app/challenge.accept", "/app/challenge.decline", "/app/challenge.cancel");
-    private static final String USER_QUEUE_PREFIX = "/user/queue/";
+    private static final Set<String> ALLOWED_SUBSCRIPTIONS = Set.of(
+            "/user/topic/challenges", "/user/topic/errors", "/user/topic/notifications", "/user/topic/presence");
     private final JwtService jwtService;
 
     public JwtStompChannelInterceptor(JwtService jwtService) {
@@ -58,7 +59,7 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
     }
 
     private void validateSubscription(Message<?> message, String destination) {
-        if (destination == null || !destination.startsWith(USER_QUEUE_PREFIX)) {
+        if (destination == null || !ALLOWED_SUBSCRIPTIONS.contains(destination)) {
             throw new MessageDeliveryException(message, "Subscription destination is not allowed");
         }
     }

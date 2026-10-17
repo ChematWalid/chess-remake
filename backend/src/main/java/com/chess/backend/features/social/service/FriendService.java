@@ -104,7 +104,7 @@ public class FriendService {
                 relation.setStatus(FriendshipStatus.PENDING);
             }
         } else friendships.save(new Friendship(requester, target, FriendshipStatus.PENDING));
-        messages.publish(target.getId(), "/queue/notifications",
+        messages.publish(target.getId(), "/topic/notifications",
                 new UserNotification(NotificationType.FRIEND_REQUEST, requester.getPublicId().toString()));
     }
 
@@ -219,7 +219,7 @@ public class FriendService {
     private static void ensureDifferent(long first, long second) { if (first == second) throw new SelfFriendActionException("You cannot perform this action with yourself"); }
     private static FriendshipUnavailableException unavailable() { return new FriendshipUnavailableException( "This action is unavailable"); }
     private void notifyStatus(User recipient, NotificationType type, UUID subjectId) {
-        messages.publish(recipient.getId(), "/queue/notifications", new UserNotification(type, subjectId.toString()));
+        messages.publish(recipient.getId(), "/topic/notifications", new UserNotification(type, subjectId.toString()));
     }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }

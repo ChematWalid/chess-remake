@@ -1,3 +1,6 @@
+x-redis-credentials: &redis-credentials
+  APP_REDIS_SECRET: ${APP_REDIS_SECRET:?Set the Redis credential in .env.deploy}
+
 services:
   edge:
     image: caddy:2.10-alpine
@@ -48,6 +51,11 @@ services:
       APP_JWT_SECRET: ${APP_JWT_SECRET:?Set APP_JWT_SECRET in .env.deploy}
       APP_ENGINE_JWT_SECRET: ${APP_ENGINE_JWT_SECRET:?Set APP_ENGINE_JWT_SECRET in .env.deploy}
       APP_INTERNAL_TOKEN: ${APP_INTERNAL_TOKEN:?Set APP_INTERNAL_TOKEN in .env.deploy}
+      REDIS_HOST: redis
+      <<: *redis-credentials
+      APP_STOMP_RELAY_HOST: rabbitmq
+      APP_STOMP_RELAY_LOGIN: ${APP_STOMP_RELAY_LOGIN:?Set APP_STOMP_RELAY_LOGIN in .env.deploy}
+      APP_STOMP_RELAY_PASSCODE: ${APP_STOMP_RELAY_PASSCODE:?Set APP_STOMP_RELAY_PASSCODE in .env.deploy}
       APP_ACCESS_TOKEN_TTL: ${APP_ACCESS_TOKEN_TTL:-PT15M}
       APP_REFRESH_TOKEN_TTL: ${APP_REFRESH_TOKEN_TTL:-P7D}
       APP_ROOM_TOKEN_TTL: ${APP_ROOM_TOKEN_TTL:-PT2M}
@@ -81,6 +89,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
       interval: 20s
@@ -138,7 +150,39 @@ services:
       - deploy-minio:/data
     restart: unless-stopped
 
+  redis:
+    image: redis:7.4-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$APP_REDIS_SECRET\""]
+    environment:
+      <<: *redis-credentials
+    expose:
+      - "6379"
+    volumes:
+      - deploy-redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$APP_REDIS_SECRET\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    command: ["sh", "-c", "rabbitmq-plugins enable --offline rabbitmq_stomp && exec rabbitmq-server"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${APP_STOMP_RELAY_LOGIN:?Set APP_STOMP_RELAY_LOGIN in .env.deploy}
+      RABBITMQ_DEFAULT_PASS: ${APP_STOMP_RELAY_PASSCODE:?Set APP_STOMP_RELAY_PASSCODE in .env.deploy}
+    expose:
+      - "61613"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_port_listener 61613"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
 volumes:
   chess-outbox:
   deploy-minio:
   deploy-postgres:
+  deploy-redis:

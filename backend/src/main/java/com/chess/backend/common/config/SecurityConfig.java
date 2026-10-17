@@ -3,6 +3,7 @@ package com.chess.backend.common.config;
 import com.chess.backend.common.api.AppResponse;
 import com.chess.backend.features.auth.service.OAuthSuccessHandler;
 import com.chess.backend.common.security.RefreshCookieOriginFilter;
+import com.chess.backend.common.security.AuthRateLimitFilter;
 import com.chess.backend.common.domain.enums.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.chess.backend.features.auth.security.JwtAuthenticationFilter;
@@ -19,17 +20,33 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter, OAuthSuccessHandler oAuthSuccessHandler,
+    AuthRateLimitFilter authRateLimitFilter(StringRedisTemplate redis, ObjectMapper objectMapper) {
+        return new AuthRateLimitFilter(redis, objectMapper);
+    }
+
+    @Bean
+    FilterRegistrationBean<AuthRateLimitFilter> authRateLimitFilterRegistration(AuthRateLimitFilter filter) {
+        FilterRegistrationBean<AuthRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
+                                            AuthRateLimitFilter authRateLimitFilter, OAuthSuccessHandler oAuthSuccessHandler,
                                             ObjectMapper objectMapper, AppProperties properties) throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -57,6 +74,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth -> oauth.successHandler(oAuthSuccessHandler).failureHandler(oAuthSuccessHandler))
                 .addFilterBefore(new RefreshCookieOriginFilter(properties, objectMapper), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(authRateLimitFilter, AuthorizationFilter.class)
                 .build();
     }
 

@@ -19,6 +19,11 @@ public interface GameChallengeRepository extends JpaRepository<GameChallenge, Lo
     @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged where challenge.id = :id")
     Optional<GameChallenge> lockById(@Param("id") long id);
     Optional<GameChallenge> findByRoomCode(String roomCode);
+    @EntityGraph(attributePaths = {"challenger", "challenged"})
+    @Query("select challenge from GameChallenge challenge where challenge.status = :status "
+            + "and (challenge.challenger.id in :userIds or challenge.challenged.id in :userIds)")
+    List<GameChallenge> findActiveForParticipants(@Param("status") ChallengeStatus status,
+                                                  @Param("userIds") List<Long> userIds);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select challenge from GameChallenge challenge join fetch challenge.challenger join fetch challenge.challenged where challenge.roomCode = :roomCode")
     Optional<GameChallenge> lockByRoomCode(@Param("roomCode") String roomCode);

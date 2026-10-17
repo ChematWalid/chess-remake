@@ -11,7 +11,7 @@ function AssignedGameNavigator() {
   const navigate = useNavigate();
   useEffect(
     () =>
-      subscribe("/user/queue/challenges", (payload) => {
+      subscribe("/user/topic/challenges", (payload) => {
         const event = challengeEventSchema.parse(payload);
         if (event.eventType === "MATCH_ASSIGNED")
           navigate(`/game/${event.challengeId}`);
