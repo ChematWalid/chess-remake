@@ -72,4 +72,15 @@ TEST(Fen, ParseMalformedStrings) {
 
     /** @brief Invalid active color */
     EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 x - - 0 1"), std::invalid_argument);
+
+    /** @brief Both move counters are required and must contain valid values */
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - -"), std::invalid_argument);
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - nope 1"), std::invalid_argument);
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - 0 nope"), std::invalid_argument);
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - -1 1"), std::invalid_argument);
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - 0 0"), std::invalid_argument);
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - 2147483648 1"), std::invalid_argument);
+
+    /** @brief FEN has exactly six fields */
+    EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 w - - 0 1 extra"), std::invalid_argument);
 }
