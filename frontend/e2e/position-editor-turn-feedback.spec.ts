@@ -606,6 +606,30 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
   expect(delayedOpponentEvent).toBeDefined();
   socket?.send(delayedOpponentEvent!);
   await expect.poll(() => playedMoves).toContain("a2a3");
+  const movesPanel = page.locator(".moves-panel");
+  await movesPanel.getByRole("button", { name: "Previous move" }).click();
+  await expect(movesPanel.getByText("Viewing 2/3")).toBeVisible();
+  await movesPanel.getByRole("button", { name: "e4" }).click();
+  await expect(movesPanel.getByText("Viewing 1/3")).toBeVisible();
+  await page.locator('[data-square="b2"]').click();
+  await page.locator('[data-square="b3"]').click();
+  expect(playedMoves).toEqual(["e2e4", "a2a3"]);
+  const opponentMove = serverGame.move({ from: "g8", to: "f6" });
+  socket?.send(JSON.stringify(moveEvent(serverGame, opponentMove.san, "g8f6")));
+  await expect(movesPanel.getByRole("button", { name: "Nf6" })).toBeVisible();
+  await expect(movesPanel.getByText("Viewing 1/4")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(movesPanel.getByText("Viewing 2/4")).toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(movesPanel.getByText("Viewing 0/4")).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(movesPanel.getByText("Live")).toBeVisible();
+  await movesPanel.getByRole("button", { name: "Previous move" }).click();
+  await expect(movesPanel.getByText("Viewing 3/4")).toBeVisible();
+  await movesPanel
+    .getByRole("button", { name: "Return to live position" })
+    .click();
+  await expect(movesPanel.getByText("Live")).toBeVisible();
   await expect
     .poll(async () =>
       page.evaluate(
