@@ -34,6 +34,34 @@ const preferences = {
   notificationSoundsEnabled: false,
 };
 
+test("Google OAuth button displays the provider logo", async ({ page }) => {
+  await page.route("**/api/auth/refresh", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: false,
+        errorCode: "REFRESH_TOKEN_INVALID",
+        message: "Sign in required",
+      }),
+    }),
+  );
+
+  await page.goto(`${appUrl}/login`);
+
+  const googleButton = page.getByRole("link", { name: "Continue with Google" });
+  await expect(googleButton).toHaveAttribute(
+    "href",
+    /oauth2\/authorization\/google/,
+  );
+  await expect(googleButton.locator("svg")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  await expect(googleButton.locator('path[fill="#4285F4"]')).toBeAttached();
+  await expect(googleButton.locator('path[fill="#EA4335"]')).toBeAttached();
+});
+
 test("email and password registration submits and opens the sign-in step", async ({
   page,
 }) => {
