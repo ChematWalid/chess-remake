@@ -670,6 +670,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
     if (optimisticMoveRef.current) return;
     const target = square as Square;
     if (selected) {
+      const piece = new Chess(displayedFen).get(target);
+      if (piece && piece.color === color[0]) {
+        setSelected(target === selected ? null : target);
+        return;
+      }
       attemptMove(selected, target);
       return;
     }
