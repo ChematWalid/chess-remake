@@ -40,6 +40,34 @@ function shouldPersist(queryKey: readonly unknown[]): boolean {
   );
 }
 
+function persistQueryCache(queryClient: QueryClient, userId: string): void {
+  const now = Date.now();
+  const persistable = queryClient
+    .getQueryCache()
+    .getAll()
+    .filter(
+      (query) =>
+        shouldPersist(query.queryKey) &&
+        query.state.status === "success" &&
+        query.state.dataUpdatedAt > now - CACHE_MAX_AGE,
+    );
+  if (!persistable.length) {
+    void deleteBrowserValue(storageKey(userId));
+    return;
+  }
+
+  const persistableHashes = new Set(
+    persistable.map((query) => query.queryHash),
+  );
+  const state = dehydrate(queryClient, {
+    shouldDehydrateQuery: (query) => persistableHashes.has(query.queryHash),
+  });
+  void setBrowserValue(storageKey(userId), {
+    state,
+    savedAt: now,
+  } satisfies PersistedQueryCache).catch(() => undefined);
+}
+
 export function BrowserQueryCache({
   queryClient,
   children,
@@ -84,49 +112,15 @@ export function BrowserQueryCache({
 
     const persist = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const now = Date.now();
-        const state = queryClient.getQueryCache().getAll();
-        const persistable = state.filter(
-          (query) =>
-            shouldPersist(query.queryKey) &&
-            query.state.status === "success" &&
-            query.state.dataUpdatedAt > now - CACHE_MAX_AGE,
-        );
-        if (!persistable.length) {
-          void deleteBrowserValue(storageKey(userId));
-          return;
-        }
-        const dehydrated: DehydratedState = dehydrate(queryClient, {
-          shouldDehydrateQuery: (query) =>
-            persistable.some(
-              (candidate) => candidate.queryHash === query.queryHash,
-            ),
-        });
-        void setBrowserValue(storageKey(userId), {
-          state: dehydrated,
-          savedAt: now,
-        } satisfies PersistedQueryCache).catch(() => undefined);
-      }, 250);
+      timer = window.setTimeout(
+        () => persistQueryCache(queryClient, userId),
+        250,
+      );
     };
 
     const flush = () => {
       window.clearTimeout(timer);
-      const now = Date.now();
-      const dehydrated = dehydrate(queryClient, {
-        shouldDehydrateQuery: (query) =>
-          shouldPersist(query.queryKey) &&
-          query.state.status === "success" &&
-          query.state.dataUpdatedAt > now - CACHE_MAX_AGE,
-      });
-      if (!dehydrated.queries.length) {
-        void deleteBrowserValue(storageKey(userId));
-        return;
-      }
-      void setBrowserValue(storageKey(userId), {
-        state: dehydrated,
-        savedAt: now,
-      } satisfies PersistedQueryCache).catch(() => undefined);
+      persistQueryCache(queryClient, userId);
     };
 
     const unsubscribe = queryClient.getQueryCache().subscribe(persist);
