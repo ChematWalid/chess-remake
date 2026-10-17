@@ -66,6 +66,13 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const hasClock = clock !== null;
 
   useEffect(() => {
+    if (!live || !detail.data || !("playerColor" in detail.data)) return;
+    const assignedColor = detail.data.playerColor;
+    if (assignedColor === "WHITE" || assignedColor === "BLACK")
+      setColor(assignedColor.toLowerCase() as "white" | "black");
+  }, [live, detail.data]);
+
+  useEffect(() => {
     if (
       !live ||
       !detail.data ||
@@ -243,6 +250,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const replay =
     !live && detail.data && "summary" in detail.data
       ? (detail.data as GameDetail)
+      : null;
+  const opponentUsername =
+    live && detail.data && "opponentUsername" in detail.data
+      ? detail.data.opponentUsername
       : null;
   const currentFen = replay
     ? (replay.fens[index] ?? replay.fens[0] ?? new Chess().fen())
@@ -428,7 +439,13 @@ export function GamePage({ live = false }: { live?: boolean }) {
       <div className="game-layout">
         <section className="board-column">
           <div className="opponent-strip">
-            <Text fw={600}>{live ? "Opponent" : summary?.blackUsername}</Text>
+            <Text fw={600}>
+              {live
+                ? opponentUsername
+                  ? `Opponent · ${opponentUsername}`
+                  : "Opponent"
+                : summary?.blackUsername}
+            </Text>
             {clock && (
               <Text className="clock">
                 {formatClock(clock[color === "white" ? "black" : "white"])}
@@ -442,7 +459,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
           />
           {live && (
             <div className="opponent-strip">
-              <Text fw={600}>You · {color}</Text>
+              <Text fw={600}>You · {color === "white" ? "White" : "Black"}</Text>
               {clock && (
                 <Text className="clock">{formatClock(clock[color])}</Text>
               )}

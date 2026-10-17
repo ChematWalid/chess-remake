@@ -2,6 +2,7 @@ import { Chessboard } from "react-chessboard";
 import type { ChessboardOptions, PieceRenderObject } from "react-chessboard";
 import type { BoardPalette } from "../../../shared/api/types";
 import piecesSprite from "../../../../pngfind.com-chess-pieces-png-6922125.png";
+import "./ChessBoard.css";
 
 const pieceColumns: Record<string, number> = {
   K: 0,
@@ -15,7 +16,6 @@ const spritePieces: PieceRenderObject = Object.fromEntries(
   ["w", "b"].flatMap((color) =>
     Object.keys(pieceColumns).map((piece) => {
       const column = pieceColumns[piece] ?? 0;
-      const row = color === "w" ? 0 : 1;
       const key = `${color}${piece}`;
       return [
         key,
@@ -23,8 +23,13 @@ const spritePieces: PieceRenderObject = Object.fromEntries(
           <div
             className={`sprite-piece sprite-${color}`}
             style={{
-              backgroundImage: `url(${piecesSprite})`,
-              backgroundPosition: `${column * 20}% ${row * 100}%`,
+              backgroundColor: color === "w" ? "#f8f5e9" : "#202820",
+              maskImage: `url(${piecesSprite})`,
+              WebkitMaskImage: `url(${piecesSprite})`,
+              maskSize: "600% 200%",
+              WebkitMaskSize: "600% 200%",
+              maskPosition: `${column * 20}% 0%`,
+              WebkitMaskPosition: `${column * 20}% 0%`,
             }}
             aria-label={`${color === "w" ? "White" : "Black"} ${piece}`}
           />
