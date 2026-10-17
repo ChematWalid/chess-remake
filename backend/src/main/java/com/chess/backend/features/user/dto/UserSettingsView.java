@@ -10,4 +10,5 @@ public record UserSettingsView(@NotNull BoardPalette boardPalette, @NotNull Boar
         @NotNull MotionPreference motionPreference, @NotNull ThemePreference themePreference,
         boolean showCoordinates, boolean showLegalMoveHints,
         boolean premovesEnabled, boolean moveConfirmation, boolean gameSoundsEnabled,
+        boolean turnIndicatorEnabled, boolean turnSoundEnabled,
         boolean inAppNotificationsEnabled, boolean notificationSoundsEnabled) { }

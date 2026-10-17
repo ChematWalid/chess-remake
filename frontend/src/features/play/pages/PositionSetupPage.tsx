@@ -1,6 +1,6 @@
 import { Button, Group, Select, Stack, Text } from "@mantine/core";
 import { Chess } from "chess.js";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChessboardOptions } from "react-chessboard";
 import { useLocation, useNavigate } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
@@ -20,6 +20,19 @@ import type {
   BoardPiece,
   ChallengePosition,
 } from "../../position/utils/positionUtils";
+
+interface EditorSnapshot {
+  mode: "MOVES" | "DIRECT";
+  fen: string;
+  start: string;
+  setupMoves: string[];
+  setupFens: string[];
+}
+
+interface EditorHistory {
+  past: EditorSnapshot[];
+  future: EditorSnapshot[];
+}
 
 export function PositionSetupPage() {
   const navigate = useNavigate();
@@ -48,40 +61,113 @@ export function PositionSetupPage() {
   );
   const [setupFens, setSetupFens] = useState(importedPosition?.setupFens ?? []);
   const gameRef = useRef<Chess | null>(null);
+  const [history, setHistory] = useState<EditorHistory>({
+    past: [],
+    future: [],
+  });
+
+  function snapshot(): EditorSnapshot {
+    return { mode, fen, start, setupMoves, setupFens };
+  }
+
+  function applySnapshot(value: EditorSnapshot) {
+    setMode(value.mode);
+    setFen(value.fen);
+    setFenInput(value.fen);
+    setStart(value.start);
+    setSetupMoves(value.setupMoves);
+    setSetupFens(value.setupFens);
+    gameRef.current = value.mode === "MOVES" ? new Chess(value.fen) : null;
+    setPiece(null);
+  }
+
+  function commitSnapshot(value: EditorSnapshot) {
+    setHistory((current) => ({
+      past: [...current.past, snapshot()].slice(-100),
+      future: [],
+    }));
+    applySnapshot(value);
+  }
+
+  function undo() {
+    const previous = history.past.at(-1);
+    if (!previous) return;
+    const current = snapshot();
+    applySnapshot(previous);
+    setHistory({
+      past: history.past.slice(0, -1),
+      future: [current, ...history.future],
+    });
+  }
+
+  function redo() {
+    const next = history.future[0];
+    if (!next) return;
+    const current = snapshot();
+    applySnapshot(next);
+    setHistory({
+      past: [...history.past, current].slice(-100),
+      future: history.future.slice(1),
+    });
+  }
+
+  useEffect(() => {
+    function handleHistoryShortcut(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z")
+        return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest("input, textarea, select"))
+      )
+        return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener("keydown", handleHistoryShortcut);
+    return () => window.removeEventListener("keydown", handleHistoryShortcut);
+  });
 
   function switchMode(nextMode: "MOVES" | "DIRECT") {
-    setMode(nextMode);
+    if (nextMode === mode) return;
+    const next: EditorSnapshot = { ...snapshot(), mode: nextMode };
     if (nextMode === "MOVES") {
-      setFen(standardFen);
-      setFenInput(standardFen);
-      setSetupMoves([]);
-      setSetupFens([]);
+      next.fen = standardFen;
+      next.start = "STANDARD";
+      next.setupMoves = [];
+      next.setupFens = [];
       gameRef.current = new Chess();
     }
+    commitSnapshot(next);
   }
 
   function setBoardStart(value: string | null) {
     if (value === "CUSTOM") return;
     const nextFen = value === "EMPTY" ? emptyFen : standardFen;
-    setStart(value ?? "STANDARD");
-    setFen(nextFen);
-    setFenInput(nextFen);
-    setSetupMoves([]);
-    setSetupFens([]);
+    const next: EditorSnapshot = {
+      ...snapshot(),
+      start: value ?? "STANDARD",
+      fen: nextFen,
+      setupMoves: [],
+      setupFens: [],
+    };
     gameRef.current = value === "EMPTY" ? null : new Chess();
-    if (value === "EMPTY" && mode === "MOVES") setMode("DIRECT");
+    if (value === "EMPTY" && mode === "MOVES") next.mode = "DIRECT";
+    commitSnapshot(next);
   }
 
   function importFen() {
     try {
       const nextFen = normalizeFen(fenInput);
       fenBoard(nextFen);
-      setFen(nextFen);
-      setStart("CUSTOM");
-      setMode("DIRECT");
-      setSetupMoves([]);
-      setSetupFens([]);
-      gameRef.current = null;
+      commitSnapshot({
+        mode: "DIRECT",
+        fen: nextFen,
+        start: "CUSTOM",
+        setupMoves: [],
+        setupFens: [],
+      });
       notifications.show({
         title: "FEN loaded",
         message: "The editor is now in direct setup mode.",
@@ -109,9 +195,7 @@ export function PositionSetupPage() {
       fields[2] = "-";
       fields[3] = "-";
       const nextFen = serializeFenBoard(board, fields);
-      setFen(nextFen);
-      setFenInput(nextFen);
-      setStart("CUSTOM");
+      commitSnapshot({ ...snapshot(), fen: nextFen, start: "CUSTOM" });
     } catch {
       notifications.show({
         title: "Could not update the board",
@@ -140,9 +224,7 @@ export function PositionSetupPage() {
       fields[2] = "-";
       fields[3] = "-";
       const nextFen = serializeFenBoard(board, fields);
-      setFen(nextFen);
-      setFenInput(nextFen);
-      setStart("CUSTOM");
+      commitSnapshot({ ...snapshot(), fen: nextFen, start: "CUSTOM" });
       return true;
     }
     if (setupMoves.length >= 300) return false;
@@ -160,13 +242,12 @@ export function PositionSetupPage() {
         move.to,
         move.piece,
       );
-      setFen(nextFen);
-      setSetupMoves((previous) => [...previous, move.san]);
-      setSetupFens((previous) => [
-        ...(previous.length ? previous : [standardFen]),
-        nextFen,
-      ]);
-      setFenInput(nextFen);
+      commitSnapshot({
+        ...snapshot(),
+        fen: nextFen,
+        setupMoves: [...setupMoves, move.san],
+        setupFens: [...(setupFens.length ? setupFens : [standardFen]), nextFen],
+      });
       return true;
     } catch {
       return false;
@@ -238,15 +319,38 @@ export function PositionSetupPage() {
         </div>
       </header>
       <div className="panel" style={{ maxWidth: 980, marginInline: "auto" }}>
+        <Group justify="space-between" mb="md">
+          <Text size="sm" c="dimmed">
+            Choose a setup style, then build the position on the board.
+          </Text>
+          <Group gap="xs">
+            <Button
+              variant="default"
+              onClick={undo}
+              disabled={!history.past.length}
+            >
+              Undo
+            </Button>
+            <Button
+              variant="default"
+              onClick={redo}
+              disabled={!history.future.length}
+            >
+              Redo
+            </Button>
+          </Group>
+        </Group>
         <Group grow mb="md">
           <Button
             variant={mode === "MOVES" ? "filled" : "default"}
+            aria-pressed={mode === "MOVES"}
             onClick={() => switchMode("MOVES")}
           >
             Play a move sequence
           </Button>
           <Button
             variant={mode === "DIRECT" ? "filled" : "default"}
+            aria-pressed={mode === "DIRECT"}
             onClick={() => setMode("DIRECT")}
           >
             Arrange pieces
@@ -265,20 +369,23 @@ export function PositionSetupPage() {
               onChange={setBoardStart}
               allowDeselect={false}
             />
+            <Text size="sm" c="dimmed">
+              {mode === "MOVES"
+                ? "Make legal moves from the starting position to build your challenge."
+                : "Place, move, or remove pieces to create a custom board."}
+            </Text>
             <PositionBoardEditor
               mode={mode}
               fen={fen}
               selectedPiece={piece}
               onFenChange={(value) => {
-                setFen(value);
-                setFenInput(value);
+                let nextFen = value;
                 if (value.split(" ")[1] !== fen.split(" ")[1]) {
                   const fields = value.split(" ");
                   fields[3] = "-";
-                  const nextFen = fields.join(" ");
-                  setFen(nextFen);
-                  setFenInput(nextFen);
+                  nextFen = fields.join(" ");
                 }
+                commitSnapshot({ ...snapshot(), fen: nextFen });
               }}
               onPieceSelect={setPiece}
               onSquareClick={handleSquareClick}
