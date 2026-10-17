@@ -433,40 +433,7 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
   page,
 }) => {
   await installAuthenticatedSession(page);
-  await page.addInitScript(() => {
-    const frequencies: number[] = [];
-    Object.defineProperty(window, "rookTestFrequencies", {
-      value: frequencies,
-    });
-    class TestAudioContext {
-      currentTime = 0;
-      state = "running";
-      destination = {};
-      resume() {
-        this.state = "running";
-        return Promise.resolve();
-      }
-      createOscillator() {
-        const oscillator = {
-          type: "sine",
-          frequency: { value: 0 },
-          connect() {},
-          start() {
-            frequencies.push(oscillator.frequency.value);
-          },
-          stop() {},
-        };
-        return oscillator;
-      }
-      createGain() {
-        return {
-          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
-          connect() {},
-        };
-      }
-    }
-    Object.defineProperty(window, "AudioContext", { value: TestAudioContext });
-  });
+  await installAudioSpy(page);
 
   let finishSettingsFetch: () => void = () => {};
   const settingsLoaded = new Promise<void>((resolve) => {
@@ -757,13 +724,19 @@ test("queues a pawn recapture onto an occupied friendly square", async ({
   page,
 }) => {
   await installAuthenticatedSession(page);
-  await page.route("**/api/users/me/settings", (route) =>
-    route.fulfill({
+  await installAudioSpy(page);
+  let finishSettingsFetch: () => void = () => {};
+  const settingsLoaded = new Promise<void>((resolve) => {
+    finishSettingsFetch = resolve;
+  });
+  await page.route("**/api/users/me/settings", async (route) => {
+    await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: envelope(preferences),
-    }),
-  );
+      body: envelope({ ...preferences, gameSoundsEnabled: true }),
+    });
+    finishSettingsFetch();
+  });
   await page.route("**/api/users/turn_rival/profile", (route) =>
     route.fulfill({
       status: 200,
@@ -846,15 +819,133 @@ test("queues a pawn recapture onto an occupied friendly square", async ({
   });
 
   await page.goto(`${appUrl}/game/53`);
+  await settingsLoaded;
+  await expect(page.getByText("Connected to the game server")).toBeVisible();
+  const blackOpening = serverGame.move({ from: "h8", to: "g8" });
+  socket?.send(JSON.stringify(moveEvent(serverGame, blackOpening.san, "h8g8")));
+  await expect(page.locator(".moves-panel")).toContainText("Kg8");
+  await page.locator('[data-square="a1"]').click();
+  await page.locator('[data-square="a4"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { rookTestFrequencies: number[] })
+            .rookTestFrequencies,
+      ),
+    )
+    .toContain(280);
+  await expect(page.getByText("Move rejected")).toHaveCount(0);
+
+  await page.locator('[data-square="a1"]').click();
+  await page.locator('[data-square="b1"]').click();
+  await expect.poll(() => playedMoves).toEqual(["a1b1"]);
+
   await page.locator('[data-square="d4"]').click();
   await page.locator('[data-square="e5"]').click();
-  await expect(page.getByText("Premove queued")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { rookTestFrequencies: number[] })
+            .rookTestFrequencies,
+      ),
+    )
+    .toContain(920);
+  await expect(page.getByText("Premove queued")).toHaveCount(0);
+  await expect(page.locator(".premove-queue")).toBeVisible();
+  const frequencyCountBeforeRightDrag = await page.evaluate(
+    () =>
+      (window as Window & { rookTestFrequencies: number[] }).rookTestFrequencies
+        .length,
+  );
+  const fromSquare = await page.locator('[data-square="e5"]').boundingBox();
+  const toSquare = await page.locator('[data-square="f5"]').boundingBox();
+  expect(fromSquare).not.toBeNull();
+  expect(toSquare).not.toBeNull();
+  await page.mouse.move(
+    fromSquare!.x + fromSquare!.width / 2,
+    fromSquare!.y + fromSquare!.height / 2,
+  );
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(
+    toSquare!.x + toSquare!.width / 2,
+    toSquare!.y + toSquare!.height / 2,
+    { steps: 3 },
+  );
+  await page.mouse.up({ button: "right" });
+  await expect(page.locator(".premove-queue")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as Window & { rookTestFrequencies: number[] })
+          .rookTestFrequencies.length,
+    ),
+  ).toBe(frequencyCountBeforeRightDrag);
+  await page.locator('[data-square="e5"]').click({ button: "right" });
+  await expect(page.locator(".premove-queue")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { rookTestFrequencies: number[] })
+            .rookTestFrequencies.length,
+      ),
+    )
+    .toBe(frequencyCountBeforeRightDrag + 1);
+  expect(playedMoves).toEqual(["a1b1"]);
+  await page.locator('[data-square="d4"]').click();
+  await page.locator('[data-square="e5"]').click();
+  await expect(page.locator(".premove-queue")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { rookTestFrequencies: number[] })
+            .rookTestFrequencies,
+      ),
+    )
+    .toContain(920);
   const opponentCapture = serverGame.move({ from: "f6", to: "e5" });
   expect(opponentCapture.san).toBe("fxe5");
   socket?.send(
     JSON.stringify(moveEvent(serverGame, opponentCapture.san, "f6e5")),
   );
-  await expect.poll(() => playedMoves).toEqual(["d4e5"]);
+  await expect.poll(() => playedMoves).toEqual(["a1b1", "d4e5"]);
+
+  const opponentReply = serverGame.move({ from: "g8", to: "h8" });
+  socket?.send(
+    JSON.stringify(moveEvent(serverGame, opponentReply.san, "g8h8")),
+  );
+  await expect(page.locator(".moves-panel")).toContainText("Kh8");
+  await page.locator('[data-square="e5"]').click();
+  await page.locator('[data-square="e8"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          window as Window & { rookTestFrequencies: number[] }
+        ).rookTestFrequencies.at(-1),
+      ),
+    )
+    .toBe(280);
+  await expect(page.getByText("Move rejected")).toHaveCount(0);
+  const frequencyCountBeforeServerRejection = await page.evaluate(
+    () =>
+      (window as Window & { rookTestFrequencies: number[] }).rookTestFrequencies
+        .length,
+  );
+  socket?.send(JSON.stringify({ event: "error", message: "Illegal move" }));
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { rookTestFrequencies: number[] })
+            .rookTestFrequencies.length,
+      ),
+    )
+    .toBe(frequencyCountBeforeServerRejection + 1);
+  await expect(page.getByText("Move rejected")).toHaveCount(0);
 });
 
 test("shows a stalemate draw from the live game result event", async ({
@@ -961,6 +1052,43 @@ async function installAuthenticatedSession(page: Page) {
       }),
     }),
   );
+}
+
+async function installAudioSpy(page: Page) {
+  await page.addInitScript(() => {
+    const frequencies: number[] = [];
+    Object.defineProperty(window, "rookTestFrequencies", {
+      value: frequencies,
+    });
+    class TestAudioContext {
+      currentTime = 0;
+      state = "running";
+      destination = {};
+      resume() {
+        this.state = "running";
+        return Promise.resolve();
+      }
+      createOscillator() {
+        const oscillator = {
+          type: "sine",
+          frequency: { value: 0 },
+          connect() {},
+          start() {
+            frequencies.push(oscillator.frequency.value);
+          },
+          stop() {},
+        };
+        return oscillator;
+      }
+      createGain() {
+        return {
+          gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          connect() {},
+        };
+      }
+    }
+    Object.defineProperty(window, "AudioContext", { value: TestAudioContext });
+  });
 }
 
 function envelope(data: unknown): string {
