@@ -13,7 +13,10 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { getAccessToken } from "../../shared/api/client";
+import {
+  getAccessToken,
+  refreshSessionAccessToken,
+} from "../../shared/api/client";
 import {
   challengeEventSchema,
   presenceEventSchema,
@@ -85,9 +88,27 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     const socketUrl = new URL("/ws", base).toString();
     setConnectionStatus("connecting");
     setConnectionError(null);
+    let lastTokenRefreshAt = 0;
     const stomp = new Client({
       webSocketFactory: () => new SockJS(socketUrl),
-      connectHeaders: { Authorization: `Bearer ${getAccessToken() ?? ""}` },
+      beforeConnect: async () => {
+        if (Date.now() - lastTokenRefreshAt >= 60_000) {
+          lastTokenRefreshAt = Date.now();
+          await refreshSessionAccessToken();
+        }
+        const token = getAccessToken();
+        if (!token) {
+          setConnected(false);
+          setConnectionStatus("disconnected");
+          setConnectionError(
+            "Your session expired. Sign in again to send challenges.",
+          );
+          throw new Error(
+            "A valid access token is required for the realtime connection.",
+          );
+        }
+        stomp.connectHeaders = { Authorization: `Bearer ${token}` };
+      },
       reconnectDelay: 2500,
       heartbeatIncoming: 10_000,
       heartbeatOutgoing: 10_000,
@@ -213,7 +234,9 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
         setConnected(false);
         setConnectionStatus(stomp.active ? "reconnecting" : "disconnected");
         setConnectionError(
-          "Realtime connection closed. The client will retry automatically.",
+          (current) =>
+            current ??
+            "Realtime connection closed. The client will retry automatically.",
         );
       },
       onWebSocketError: () => {
@@ -228,6 +251,7 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
         setConnectionStatus("reconnecting");
         setConnectionError(
           frame.headers.message ??
+            frame.body ??
             "The realtime server rejected the connection.",
         );
       },

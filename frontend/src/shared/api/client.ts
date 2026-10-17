@@ -108,6 +108,13 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+export function refreshSessionAccessToken(): Promise<string | null> {
+  refreshPromise ??= refreshAccessToken().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly errorCode: string,
