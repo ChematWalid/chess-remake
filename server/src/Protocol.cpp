@@ -36,7 +36,8 @@ std::string Protocol::gameStarted(
     const std::string& fen,
     const TimeControl& timeControl,
     int64_t whiteTimeMs,
-    int64_t blackTimeMs
+    int64_t blackTimeMs,
+    const std::vector<std::string>& moves
 ) {
     nlohmann::json j;
     j["event"] = "game_started";
@@ -52,6 +53,7 @@ std::string Protocol::gameStarted(
     }
     j["white_time_ms"] = whiteTimeMs;
     j["black_time_ms"] = blackTimeMs;
+    j["moves"] = moves;
     return j.dump();
 }
 

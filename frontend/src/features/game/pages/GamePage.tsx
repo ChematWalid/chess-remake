@@ -23,6 +23,7 @@ interface EngineEvent {
   event?: string;
   fen?: string;
   san?: string;
+  moves?: string[];
   side_to_move?: "white" | "black";
   white_time_ms?: number;
   black_time_ms?: number;
@@ -30,6 +31,12 @@ interface EngineEvent {
   reason?: string;
   message?: string;
   color?: "white" | "black";
+}
+
+function fenForTurn(fen: string, color: "white" | "black"): string {
+  const fields = fen.split(" ");
+  fields[1] = color === "white" ? "w" : "b";
+  return fields.join(" ");
 }
 
 export function GamePage({ live = false }: { live?: boolean }) {
@@ -43,6 +50,10 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const [color, setColor] = useState<"white" | "black">("white");
   const [connected, setConnected] = useState(false);
   const [finished, setFinished] = useState<string | null>(null);
+  const [drawOfferedBy, setDrawOfferedBy] = useState<"white" | "black" | null>(
+    null,
+  );
+  const [drawOfferSent, setDrawOfferSent] = useState(false);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [clock, setClock] = useState<{ white: number; black: number } | null>(
@@ -98,7 +109,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
         }
       }
       if (stopped) return;
-      if (connection.status !== "ACCEPTED" || !connection.connectUrl || !connection.token) {
+      if (
+        connection.status !== "ACCEPTED" ||
+        !connection.connectUrl ||
+        !connection.token
+      ) {
         setFinished("This accepted game is no longer available.");
         return;
       }
@@ -117,16 +132,19 @@ export function GamePage({ live = false }: { live?: boolean }) {
       const ws = new WebSocket(engineUrl);
       socket.current = ws;
       ws.onopen = () => {
-        ws.send(JSON.stringify({
-          action: "connect_token",
-          room_code: connection.roomCode,
-          token: connection.token,
-        }));
+        ws.send(
+          JSON.stringify({
+            action: "connect_token",
+            room_code: connection.roomCode,
+            token: connection.token,
+          }),
+        );
         hasWarned = false;
       };
       ws.onclose = () => {
         setConnected(false);
-        if (!stopped) retryTimer = window.setTimeout(() => void connect(true), 1500);
+        if (!stopped)
+          retryTimer = window.setTimeout(() => void connect(true), 1500);
       };
       ws.onerror = () => {
         if (!hasWarned)
@@ -146,6 +164,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
           if (event.event === "game_started" && event.fen) {
             setConnected(true);
             setFen(event.fen);
+            setMoveText(event.moves ?? []);
             setClock({
               white: event.white_time_ms ?? 0,
               black: event.black_time_ms ?? 0,
@@ -157,6 +176,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
             }
           } else if (event.event === "move_made" && event.fen) {
             setFen(event.fen);
+            setDrawOfferedBy(null);
+            setDrawOfferSent(false);
             setClock({
               white: event.white_time_ms ?? 0,
               black: event.black_time_ms ?? 0,
@@ -185,12 +206,25 @@ export function GamePage({ live = false }: { live?: boolean }) {
               }
             }
           } else if (event.event === "game_over") {
+            setDrawOfferedBy(null);
+            setDrawOfferSent(false);
             setFinished(
               event.reason
                 ? `${event.result ?? "Game over"} · ${event.reason}`
                 : (event.result ?? "Game over"),
             );
             updatePremoves([]);
+          } else if (event.event === "draw_offered") {
+            setDrawOfferedBy(event.color ?? null);
+            setDrawOfferSent(false);
+          } else if (event.event === "draw_declined") {
+            setDrawOfferedBy(null);
+            setDrawOfferSent(false);
+            notifications.show({
+              title: "Draw declined",
+              message: "Your opponent declined the draw offer.",
+              color: "yellow",
+            });
           } else if (event.event === "error") {
             notifications.show({
               title: "Move rejected",
@@ -276,6 +310,24 @@ export function GamePage({ live = false }: { live?: boolean }) {
     : fen === "start"
       ? new Chess().fen()
       : fen;
+  const displayedFen = useMemo(() => {
+    if (!live || !premoves.length) return currentFen;
+    let projection = currentFen;
+    for (const move of premoves) {
+      try {
+        const projectedGame = new Chess(fenForTurn(projection, color));
+        projectedGame.move({
+          from: move.from,
+          to: move.to,
+          promotion: move.promotion ?? "q",
+        });
+        projection = projectedGame.fen();
+      } catch {
+        break;
+      }
+    }
+    return projection;
+  }, [live, premoves, currentFen, color]);
   const turn = useMemo(() => {
     try {
       return new Chess(currentFen).turn();
@@ -290,7 +342,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
       : (prefs.boardOrientation.toLowerCase() as "white" | "black");
   const legalTargets =
     selected && prefs.showLegalMoveHints
-      ? new Chess(currentFen)
+      ? new Chess(
+          live && turn !== (color === "white" ? "w" : "b")
+            ? fenForTurn(displayedFen, color)
+            : displayedFen,
+        )
           .moves({ square: selected, verbose: true })
           .map((move) => move.to)
       : [];
@@ -327,7 +383,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
   }
 
   function removePremove(index: number) {
-    updatePremoves(livePreferences.current.premoves.filter((_, i) => i !== index));
+    updatePremoves(
+      livePreferences.current.premoves.filter((_, i) => i !== index),
+    );
   }
 
   function clearPremoves() {
@@ -380,12 +438,12 @@ export function GamePage({ live = false }: { live?: boolean }) {
       attemptMove(selected, target);
       return;
     }
-    const piece = new Chess(currentFen).get(target);
+    const piece = new Chess(displayedFen).get(target);
     if (piece && piece.color === color[0]) setSelected(target);
   }
 
   const boardOptions: ChessboardOptions = {
-    position: currentFen,
+    position: displayedFen,
     boardOrientation: colors,
     showNotation: prefs.showCoordinates,
     squareStyles: {
@@ -496,7 +554,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
           />
           {live && (
             <div className="opponent-strip">
-              <Text fw={600}>You · {color === "white" ? "White" : "Black"}</Text>
+              <Text fw={600}>
+                You · {color === "white" ? "White" : "Black"}
+              </Text>
               {clock && (
                 <Text className="clock">{formatClock(clock[color])}</Text>
               )}
@@ -504,15 +564,47 @@ export function GamePage({ live = false }: { live?: boolean }) {
           )}
           {live && (
             <Group mt="md" justify="center">
-              <Button
-                variant="default"
-                onClick={() =>
-                  socket.current?.send(JSON.stringify({ action: "offer_draw" }))
-                }
-                disabled={!connected || Boolean(finished)}
-              >
-                Offer draw
-              </Button>
+              {drawOfferedBy && drawOfferedBy !== color ? (
+                <>
+                  <Button
+                    color="green"
+                    onClick={() => {
+                      socket.current?.send(
+                        JSON.stringify({ action: "accept_draw" }),
+                      );
+                      setDrawOfferedBy(null);
+                    }}
+                    disabled={!connected || Boolean(finished)}
+                  >
+                    Accept draw
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      socket.current?.send(
+                        JSON.stringify({ action: "decline_draw" }),
+                      );
+                      setDrawOfferedBy(null);
+                    }}
+                    disabled={!connected || Boolean(finished)}
+                  >
+                    Decline draw
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    socket.current?.send(
+                      JSON.stringify({ action: "offer_draw" }),
+                    );
+                    setDrawOfferSent(true);
+                  }}
+                  disabled={!connected || Boolean(finished) || drawOfferSent}
+                >
+                  {drawOfferSent ? "Draw offered" : "Offer draw"}
+                </Button>
+              )}
               <Button
                 color="red"
                 variant="light"

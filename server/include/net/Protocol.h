@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace net {
 
@@ -45,7 +46,8 @@ public:
         const std::string& fen,
         const TimeControl& timeControl,
         int64_t whiteTimeMs,
-        int64_t blackTimeMs
+        int64_t blackTimeMs,
+        const std::vector<std::string>& moves
     );
 
     /**

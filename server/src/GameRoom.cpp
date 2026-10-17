@@ -245,7 +245,9 @@ bool GameRoom::joinWithIdentity(
         int64_t wMs = getRemainingTimeMs(chess::Color::White);
         int64_t bMs = getRemainingTimeMs(chess::Color::Black);
 
-        std::string startMsg = Protocol::gameStarted(roomCode_, fen, timeControl_, wMs, bMs);
+        std::string startMsg = Protocol::gameStarted(
+            roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan()
+        );
         if (whiteSession_) sendToSession(whiteSession_, startMsg);
         if (blackSession_) sendToSession(blackSession_, startMsg);
         for (const auto& spec : spectators_) {
@@ -255,7 +257,10 @@ bool GameRoom::joinWithIdentity(
         std::string fen = chess::Fen::serialize(game_.position());
         int64_t wMs = getRemainingTimeMs(chess::Color::White);
         int64_t bMs = getRemainingTimeMs(chess::Color::Black);
-        sendToSession(session, Protocol::gameStarted(roomCode_, fen, timeControl_, wMs, bMs));
+        sendToSession(
+            session,
+            Protocol::gameStarted(roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan())
+        );
     }
 
     return true;
