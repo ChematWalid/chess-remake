@@ -569,6 +569,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
       return "w";
     }
   }, [currentFen]);
+  const topPlayerTurn = color === "white" ? "b" : "w";
+  const bottomPlayerTurn = color === "white" ? "w" : "b";
   const checkedKingSquare = useMemo(() => {
     const game = new Chess(displayedFen);
     if (!game.isCheck()) return null;
@@ -878,7 +880,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
           <div className="opponent-strip">
             <GamePlayerIdentity
               {...topPlayer}
-              isActive={live && prefs.turnIndicatorEnabled && turn === "b"}
+              isActive={
+                live && prefs.turnIndicatorEnabled && turn === topPlayerTurn
+              }
               showTurnIndicator={live && prefs.turnIndicatorEnabled}
             />
             {clock && (
@@ -896,7 +900,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
             <div className="opponent-strip">
               <GamePlayerIdentity
                 {...bottomPlayer}
-                isActive={live && prefs.turnIndicatorEnabled && turn === "w"}
+                isActive={
+                  live &&
+                  prefs.turnIndicatorEnabled &&
+                  turn === bottomPlayerTurn
+                }
                 showTurnIndicator={live && prefs.turnIndicatorEnabled}
               />
               {clock && (
