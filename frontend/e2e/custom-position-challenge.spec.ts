@@ -58,6 +58,20 @@ test("custom position challenge reaches another backend and can be accepted", as
     const challenge = response.data ?? response;
     expect(challenge.initialFen).toBe(customFen);
     expect(challenge.challengerSide).toBe("WHITE");
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const rejected = await request.post(`${apiUrl}/api/auth/login`, {
+        data: { identifier: firstUsername, password: "incorrect-password" },
+        headers: { "X-Forwarded-For": testIp },
+      });
+      expect(rejected.status()).toBe(401);
+    }
+    const limited = await request.post(`${apiUrl}/api/auth/login`, {
+      data: { identifier: firstUsername, password: "incorrect-password" },
+      headers: { "X-Forwarded-For": testIp },
+    });
+    expect(limited.status()).toBe(429);
+    expect((await limited.json()).errorCode).toBe("AUTH_RATE_LIMITED");
   } finally {
     await firstContext.close();
     await secondContext.close();
