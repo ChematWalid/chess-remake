@@ -8,5 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserDraftRepository extends JpaRepository<UserDraft, Long> {
     List<UserDraft> findAllByUserIdOrderByFeatureKey(long userId);
     Optional<UserDraft> findByUserIdAndFeatureKey(long userId, String featureKey);
+    long countByUserId(long userId);
     void deleteByUserIdAndFeatureKey(long userId, String featureKey);
 }

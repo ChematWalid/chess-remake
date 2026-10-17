@@ -1,0 +1,2 @@
+ALTER TABLE user_drafts
+    ADD COLUMN edited_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

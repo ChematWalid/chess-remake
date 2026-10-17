@@ -37,7 +37,7 @@ public class UserDraftController {
     public UserDraftView save(@AuthenticationPrincipal ChessPrincipal principal,
                               @PathVariable @Pattern(regexp = "[a-z][a-z0-9-]{0,63}") String featureKey,
                               @Valid @RequestBody UserDraftRequest request) {
-        return service.save(principal.userId(), featureKey, request.payload());
+        return service.save(principal.userId(), featureKey, request.payload(), request.editedAt());
     }
 
     @DeleteMapping("/{featureKey}")
