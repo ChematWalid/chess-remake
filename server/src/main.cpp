@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
     std::string host;
     std::string jwtSecret;
     int disconnectGraceSeconds = 60;
-    int roomStartTimeoutSeconds = 120;
+    int roomStartTimeoutSeconds = 0;
     try {
         port = std::stoi(requiredEnvironment("CHESS_PORT"));
         host = requiredEnvironment("CHESS_HOST");
@@ -39,10 +39,7 @@ int main(int argc, char* argv[]) {
             configuredGrace != nullptr && configuredGrace[0] != '\0') {
             disconnectGraceSeconds = std::stoi(configuredGrace);
         }
-        if (const char* configuredTimeout = std::getenv("CHESS_ROOM_START_TIMEOUT_SECONDS");
-            configuredTimeout != nullptr && configuredTimeout[0] != '\0') {
-            roomStartTimeoutSeconds = std::stoi(configuredTimeout);
-        }
+        roomStartTimeoutSeconds = std::stoi(requiredEnvironment("CHESS_ROOM_START_TIMEOUT_SECONDS"));
         if (disconnectGraceSeconds < 0 || disconnectGraceSeconds > 3600) {
             throw std::runtime_error("CHESS_DISCONNECT_GRACE_SECONDS must be between 0 and 3600");
         }
@@ -66,7 +63,8 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--help" || arg == "-h") {
             std::cout << "Usage: chess_server [--port <port>] [--host <host>]\n";
             std::cout << "CHESS_PORT, CHESS_HOST, CHESS_JWT_SECRET, SPRING_WEBHOOK_URL, "
-                         "INTERNAL_WEBHOOK_SECRET, and CHESS_OUTBOX_DIR are required.\n";
+                         "INTERNAL_WEBHOOK_SECRET, CHESS_OUTBOX_DIR, and "
+                         "CHESS_ROOM_START_TIMEOUT_SECONDS are required.\n";
             return 0;
         }
     }
@@ -78,7 +76,7 @@ int main(int argc, char* argv[]) {
     std::cout << "             Chess WebSocket Server (C++23)             \n";
     std::cout << "========================================================\n";
     std::cout << " Endpoint: ws://" << host << ":" << port << "\n";
-    std::cout << " Multi-game room system with invite codes ready.\n";
+    std::cout << " Backend-authorized multi-game rooms and reconnects ready.\n";
     std::cout << " Timed and untimed (no time limit) games supported.\n";
     std::cout << " Press Ctrl+C to terminate server.\n";
     std::cout << "--------------------------------------------------------\n" << std::endl;

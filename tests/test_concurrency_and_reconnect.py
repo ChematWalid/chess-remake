@@ -2,43 +2,38 @@
 """
 Test script verifying:
 1. Multiple concurrent games running in isolated rooms on the C++ chess_server simultaneously.
-2. Disconnection and safe reconnection of a player mid-game using their signed identity token,
-   including preventing an unauthorized stranger (seat-hijacking) and resuming move play.
+2. Disconnection and safe reconnection using fresh backend-issued credentials.
+3. Invalid credentials cannot claim an active game's player seat.
+
+Requires a running Spring backend, three accepted challenges, and player-specific
+tokens in CHESS_TEST_ROOM{1,2,3}_* environment variables. Tokens must come from
+authenticated challenge detail responses; this script never signs credentials.
 """
 
 import asyncio
-import base64
-import hashlib
-import hmac
 import json
+import os
 import subprocess
 import time
-import sys
 import websockets
 
-PORT = 9077
-SECRET = "chess_secret_dev_key"
-WS_BASE = f"ws://127.0.0.1:{PORT}"
+PORT = int(os.environ.get("CHESS_TEST_SERVER_PORT", "9002"))
+WS_BASE = os.environ.get("CHESS_TEST_WS_BASE", f"ws://127.0.0.1:{PORT}")
+ROOM1 = os.environ["CHESS_TEST_ROOM1_CODE"]
+ROOM2 = os.environ["CHESS_TEST_ROOM2_CODE"]
+ROOM3 = os.environ["CHESS_TEST_ROOM3_CODE"]
+ROOM1_WHITE_TOKEN = os.environ["CHESS_TEST_ROOM1_WHITE_TOKEN"]
+ROOM1_BLACK_TOKEN = os.environ["CHESS_TEST_ROOM1_BLACK_TOKEN"]
+ROOM2_WHITE_TOKEN = os.environ["CHESS_TEST_ROOM2_WHITE_TOKEN"]
+ROOM2_BLACK_TOKEN = os.environ["CHESS_TEST_ROOM2_BLACK_TOKEN"]
+ROOM3_WHITE_TOKEN = os.environ["CHESS_TEST_ROOM3_WHITE_TOKEN"]
+ROOM3_BLACK_TOKEN = os.environ["CHESS_TEST_ROOM3_BLACK_TOKEN"]
+ROOM3_WHITE_REFRESH_TOKEN = os.environ["CHESS_TEST_ROOM3_WHITE_REFRESH_TOKEN"]
 
-def b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
-
-def make_token(room_code: str, user_id: str, display_name: str, color: str) -> str:
-    header = '{"alg":"HS256","typ":"JWT"}'
-    claims = {
-        "room_code": room_code,
-        "user_id": user_id,
-        "display_name": display_name,
-        "color": color,
-        "initial_seconds": 0,
-        "increment_seconds": 0,
-        "exp": int(time.time()) + 3600
-    }
-    h_b64 = b64url(header.encode("utf-8"))
-    p_b64 = b64url(json.dumps(claims).encode("utf-8"))
-    to_sign = f"{h_b64}.{p_b64}"
-    sig = hmac.new(SECRET.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
-    return f"{to_sign}.{b64url(sig)}"
+async def connect_player(room_code: str, token: str):
+    socket = await websockets.connect(f"{WS_BASE}/ws/play")
+    await socket.send(json.dumps({"action": "connect_token", "room_code": room_code, "token": token}))
+    return socket
 
 async def test_concurrent_multi_rooms():
     print("\n" + "=" * 60)
@@ -47,20 +42,19 @@ async def test_concurrent_multi_rooms():
 
     # Room 1: King's Pawn Game (e4, e5, Nf3, Nc6)
     # Room 2: Queen's Gambit (d4, d5, c4, c6)
-    room1_code = "ROOM01"
-    room2_code = "ROOM02"
+    room1_code = ROOM1
+    room2_code = ROOM2
 
-    t1_white = make_token(room1_code, "user-alice", "Alice", "white")
-    t1_black = make_token(room1_code, "user-bob", "Bob", "black")
-
-    t2_white = make_token(room2_code, "user-charlie", "Charlie", "white")
-    t2_black = make_token(room2_code, "user-dave", "Dave", "black")
+    t1_white = ROOM1_WHITE_TOKEN
+    t1_black = ROOM1_BLACK_TOKEN
+    t2_white = ROOM2_WHITE_TOKEN
+    t2_black = ROOM2_BLACK_TOKEN
 
     print("[Multi-Room] Connecting 4 players into 2 distinct rooms concurrently...")
-    async with websockets.connect(f"{WS_BASE}/ws/play?room={room1_code}&token={t1_white}") as ws_r1_w, \
-               websockets.connect(f"{WS_BASE}/ws/play?room={room1_code}&token={t1_black}") as ws_r1_b, \
-               websockets.connect(f"{WS_BASE}/ws/play?room={room2_code}&token={t2_white}") as ws_r2_w, \
-               websockets.connect(f"{WS_BASE}/ws/play?room={room2_code}&token={t2_black}") as ws_r2_b:
+    async with await connect_player(room1_code, t1_white) as ws_r1_w, \
+               await connect_player(room1_code, t1_black) as ws_r1_b, \
+               await connect_player(room2_code, t2_white) as ws_r2_w, \
+               await connect_player(room2_code, t2_black) as ws_r2_b:
 
         # Host receives room_created
         r1_w_created = json.loads(await ws_r1_w.recv())
@@ -163,16 +157,16 @@ async def test_disconnect_and_reconnect():
     print("TEST 2: DISCONNECT & RECONNECTING TO THE SAME GAME")
     print("=" * 60)
 
-    room_code = "RECON1"
-    token_alice = make_token(room_code, "user-alice", "Alice", "white")
-    token_bob = make_token(room_code, "user-bob", "Bob", "black")
-    token_mallory = make_token(room_code, "user-mallory", "Mallory", "white")
+    room_code = ROOM3
+    token_alice = ROOM3_WHITE_TOKEN
+    token_bob = ROOM3_BLACK_TOKEN
+    token_alice_refresh = ROOM3_WHITE_REFRESH_TOKEN
 
     print("[Reconnect] Starting Game in room RECON1...")
     # Alice connects as White
-    ws_alice = await websockets.connect(f"{WS_BASE}/ws/play?room={room_code}&token={token_alice}")
+    ws_alice = await connect_player(room_code, token_alice)
     # Bob connects as Black
-    ws_bob = await websockets.connect(f"{WS_BASE}/ws/play?room={room_code}&token={token_bob}")
+    ws_bob = await connect_player(room_code, token_bob)
 
     # Read start messages
     alice_created = json.loads(await ws_alice.recv()) # room_created
@@ -208,16 +202,15 @@ async def test_disconnect_and_reconnect():
 
     # A stranger (Mallory) tries to jump in and steal Alice's seat!
     print("\n[Reconnect] 🚫 Stranger (Mallory) attempts to hijack Alice's seat...")
-    async with websockets.connect(f"{WS_BASE}/ws/play?room={room_code}&token={token_mallory}") as ws_mallory:
-        mallory_joined = json.loads(await ws_mallory.recv())
-        mallory_started = json.loads(await ws_mallory.recv())
-        print(f"  Mallory response: {mallory_joined}")
-        assert mallory_joined["role"] == "spectator", f"Security violation: Mallory took seat! {mallory_joined}"
-        print("✓ Security check passed: Mallory was relegated to SPECTATOR. Seat preserved for Alice!")
+    async with websockets.connect(f"{WS_BASE}/ws/play") as ws_mallory:
+        await ws_mallory.send(json.dumps({"action": "connect_token", "room_code": room_code, "token": "invalid"}))
+        rejection = json.loads(await ws_mallory.recv())
+        assert rejection["event"] == "error", f"Invalid credentials must be rejected: {rejection}"
+        print("✓ Security check passed: invalid credentials cannot claim a room seat")
 
     # Now Alice reconnects with her token!
     print("\n[Reconnect] 🔄 Alice reconnects with her signed token...")
-    async with websockets.connect(f"{WS_BASE}/ws/play?room={room_code}&token={token_alice}") as ws_alice_reconnected:
+    async with await connect_player(room_code, token_alice_refresh) as ws_alice_reconnected:
         alice_join = json.loads(await ws_alice_reconnected.recv())
         print(f"  Alice reconnected join response: {alice_join}")
         assert alice_join["event"] == "room_joined" and alice_join["role"] == "white"
@@ -247,11 +240,20 @@ async def test_disconnect_and_reconnect():
 
 async def main():
     print(f"Starting chess_server on port {PORT}...")
+    server_environment = os.environ.copy()
+    environment_file = os.environ.get("CHESS_ENV_FILE", "server/.env")
+    with open(environment_file, encoding="utf-8") as config_file:
+        for line in config_file:
+            key, separator, value = line.strip().partition("=")
+            if separator and key and not key.startswith("#"):
+                server_environment.setdefault(key, value)
+    server_environment["CHESS_PORT"] = str(PORT)
     server_proc = subprocess.Popen(
-        ["./build/bin/chess_server", "--port", str(PORT), "--host", "127.0.0.1"],
+        [os.environ.get("CHESS_SERVER_BINARY", "./build/bin/chess_server")],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        env=server_environment,
     )
     time.sleep(1)
 

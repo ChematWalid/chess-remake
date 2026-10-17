@@ -1,6 +1,5 @@
 #include "net/GameRoom.h"
 #include "net/IClientSession.h"
-#include "net/Protocol.h"
 
 #include <iostream>
 #include <memory>
@@ -76,20 +75,6 @@ int main() {
                   << (color ? (*color == chess::Color::White ? "white" : "black") : "spectator/none") << "\n";
         room.handleMove("mallory", "e5");
         dump("alice", *alice);
-    }
-
-    std::cout << "\n== Probe D: Protocol::parseCreateRoom time controls ==\n";
-    {
-        auto show = [](const std::string& label, const std::string& jsonText) {
-            auto params = Protocol::parseCreateRoom(nlohmann::json::parse(jsonText));
-            auto ms = params->timeControl.initialTime.count();
-            std::cout << "  " << label << " -> unlimited=" << (params->timeControl.isUnlimited ? "true" : "false")
-                      << " initial_ms=" << ms << " increment_ms=" << params->timeControl.increment.count() << "\n";
-        };
-        show("{minutes:5, increment:3}", R"({"time_control":{"minutes":5,"increment":3}})");
-        show("{seconds:30}", R"({"time_control":{"seconds":30}})");
-        show("{seconds:90}", R"({"time_control":{"seconds":90}})");
-        show("{minutes:0.5}", R"({"time_control":{"minutes":0.5}})");
     }
 
     std::cout << "\n== Probe E: draw offer state and game_over reason strings ==\n";

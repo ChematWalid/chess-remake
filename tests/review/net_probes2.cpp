@@ -66,13 +66,12 @@ int main() {
         std::cout << "  room1 isDead after alice left? " << (room1->isDead() ? "yes" : "no") << "\n";
     }
 
-    std::cout << "\n== Probe H: create_room with minutes=40000 via the router ==\n";
+    std::cout << "\n== Probe H: reject legacy unauthenticated room creation ==\n";
     {
         RoomManager manager;
         auto alice = std::make_shared<MockSession>("alice");
         manager.routeMessage(alice, R"({"action":"create_room","time_control":{"minutes":40000}})");
-        auto room = manager.getRoomBySession("alice");
-        std::cout << "  initial time ms stored: " << room->getTimeControl().initialTime.count() << "\n";
+        std::cout << "  room was created? " << (manager.activeRoomCount() == 0 ? "no" : "yes") << "\n";
     }
     return 0;
 }

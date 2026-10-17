@@ -16,29 +16,6 @@ class Protocol {
 public:
     using TimeControl = chess::ChessClock::TimeControl;
 
-    static constexpr int64_t kMinInitialSeconds = 5;
-    static constexpr int64_t kMaxInitialSeconds = 86400 * 30;
-    static constexpr int64_t kMinIncrementSeconds = 0;
-    static constexpr int64_t kMaxIncrementSeconds = 3600;
-
-    /**
-     * @brief Parsed parameters for room creation requests.
-     */
-    struct CreateRoomParams {
-        TimeControl timeControl{TimeControl::unlimited()};
-        std::optional<chess::Color> preferredColor;
-    };
-
-    /**
-     * @brief Parses room creation action parameters from a JSON payload.
-     */
-    static std::optional<CreateRoomParams> parseCreateRoom(const nlohmann::json& json);
-
-    /**
-     * @brief Parses room code from a room join request.
-     */
-    static std::optional<std::string> parseJoinRoom(const nlohmann::json& json);
-
     /**
      * @brief Parses move notation string (SAN or UCI) from a move action.
      */

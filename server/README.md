@@ -10,4 +10,4 @@ cmake --build build --target chess_server -j
 ./server/run-local.sh
 ```
 
-The local environment file sets the listen address and port, Spring webhook URL, shared secrets, and durable webhook outbox directory. The server refuses to start if required settings are missing; it does not use a built-in signing secret.
+The local environment file sets the listen address and port, Spring webhook URL, shared secrets, room-start timeout, and durable webhook outbox directory. Keep `CHESS_ROOM_START_TIMEOUT_SECONDS` aligned with backend `APP_GAME_START_TIMEOUT`. The server refuses to start if required settings are missing; it does not use a built-in signing secret.
