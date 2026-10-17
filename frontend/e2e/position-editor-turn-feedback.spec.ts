@@ -567,6 +567,24 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
   await expect(page.getByText("∞")).toHaveCount(2);
   await expect(page.locator(".game-player-identity-turn")).toHaveCount(1);
 
+  const draggedPawn = await page.locator('[data-square="e2"]').boundingBox();
+  expect(draggedPawn).not.toBeNull();
+  const pawnCenter = {
+    x: draggedPawn!.x + draggedPawn!.width / 2,
+    y: draggedPawn!.y + draggedPawn!.height / 2,
+  };
+  await page.mouse.move(pawnCenter.x, pawnCenter.y);
+  await page.mouse.down();
+  await page.mouse.move(pawnCenter.x, pawnCenter.y - draggedPawn!.height, {
+    steps: 3,
+  });
+  await page.mouse.move(pawnCenter.x, pawnCenter.y, { steps: 3 });
+  await page.mouse.up();
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("blur"));
+    window.dispatchEvent(new Event("focus"));
+  });
+
   await page.locator('[data-square="e2"]').click();
   await page.locator('[data-square="e4"]').click();
   await expect.poll(() => playedMoves).toContain("e2e4");
@@ -688,6 +706,110 @@ test("turn indicator follows the board when viewing as Black", async ({
   await expect(strips.last().locator(".game-player-identity-turn")).toHaveText(
     "To move",
   );
+});
+
+test("queues a pawn recapture onto an occupied friendly square", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.route("**/api/users/me/settings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(preferences),
+    }),
+  );
+  await page.route("**/api/users/turn_rival/profile", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        ...profile,
+        username: "turn_rival",
+        displayName: "Rival",
+      }),
+    }),
+  );
+  await page.route("**/api/challenges/53", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        challengeId: 53,
+        status: "ACCEPTED",
+        opponentPublicUserId: "223e4567-e89b-42d3-a456-426614174000",
+        opponentUsername: "turn_rival",
+        initialTimeSeconds: null,
+        incrementSeconds: null,
+        challengerSide: "BLACK",
+        playerColor: "WHITE",
+        roomCode: "ROOM53",
+        initialFen: "7k/8/5p2/4P3/3P4/8/8/K7 b - - 0 1",
+        setupMoves: [],
+        setupFens: [],
+        connectUrl: "ws://engine.test/recapture",
+        token: "test-token",
+        expiresAt: "2030-01-01T00:00:00Z",
+      }),
+    }),
+  );
+
+  const serverGame = new Chess("7k/8/5p2/4P3/3P4/8/8/K7 b - - 0 1");
+  const playedMoves: string[] = [];
+  let socket: WebSocketRoute | undefined;
+  await page.routeWebSocket("ws://engine.test/recapture", (route) => {
+    socket = route;
+    route.onMessage((message) => {
+      const request = JSON.parse(String(message)) as {
+        action?: string;
+        uci?: string;
+      };
+      if (request.action === "connect_token") {
+        route.send(
+          JSON.stringify({
+            event: "room_joined",
+            room_code: "ROOM53",
+            role: "white",
+          }),
+        );
+        route.send(
+          JSON.stringify({
+            event: "game_started",
+            room_code: "ROOM53",
+            fen: serverGame.fen(),
+            time_control: "unlimited",
+            white_time_ms: -1,
+            black_time_ms: -1,
+            moves: [],
+            setup_moves: [],
+            setup_fens: [],
+          }),
+        );
+      }
+      if (request.action === "move" && request.uci) {
+        playedMoves.push(request.uci);
+        const move = serverGame.move({
+          from: request.uci.slice(0, 2),
+          to: request.uci.slice(2, 4),
+          promotion: request.uci[4] ?? "q",
+        });
+        route.send(
+          JSON.stringify(moveEvent(serverGame, move.san, request.uci)),
+        );
+      }
+    });
+  });
+
+  await page.goto(`${appUrl}/game/53`);
+  await page.locator('[data-square="d4"]').click();
+  await page.locator('[data-square="e5"]').click();
+  await expect(page.getByText("Premove queued")).toBeVisible();
+  const opponentCapture = serverGame.move({ from: "f6", to: "e5" });
+  expect(opponentCapture.san).toBe("fxe5");
+  socket?.send(
+    JSON.stringify(moveEvent(serverGame, opponentCapture.san, "f6e5")),
+  );
+  await expect.poll(() => playedMoves).toEqual(["d4e5"]);
 });
 
 async function installAuthenticatedSession(page: Page) {

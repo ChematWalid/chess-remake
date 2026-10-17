@@ -115,11 +115,68 @@ function isLegalPremove(
   move: PendingMove,
   color: "white" | "black",
 ): boolean {
-  const game = new Chess(undefined, { skipValidation: true });
-  game.load(fenForTurn(fen, color), { skipValidation: true });
-  return game
-    .moves({ square: move.from, verbose: true })
-    .some((candidate) => candidate.to === move.to);
+  const game = new Chess(fen);
+  const piece = game.get(move.from);
+  const target = game.get(move.to);
+  if (!piece || piece.color !== color[0] || target?.type === "k") return false;
+
+  const fileDelta = move.to.charCodeAt(0) - move.from.charCodeAt(0);
+  const rankDelta = Number(move.to[1]) - Number(move.from[1]);
+  const absFileDelta = Math.abs(fileDelta);
+  const absRankDelta = Math.abs(rankDelta);
+  if (absFileDelta === 0 && absRankDelta === 0) return false;
+
+  if (piece.type === "p") {
+    const direction = color === "white" ? 1 : -1;
+    const startRank = color === "white" ? 2 : 7;
+    if (absFileDelta === 1 && rankDelta === direction) return true;
+    if (fileDelta !== 0 || rankDelta * direction <= 0) return false;
+    if (rankDelta === direction) return !target;
+    return (
+      Number(move.from[1]) === startRank &&
+      rankDelta === direction * 2 &&
+      !game.get(`${move.from[0]}${Number(move.from[1]) + direction}` as Square)
+    );
+  }
+
+  if (piece.type === "n")
+    return (
+      (absFileDelta === 1 && absRankDelta === 2) ||
+      (absFileDelta === 2 && absRankDelta === 1)
+    );
+
+  if (piece.type === "k" && absFileDelta === 2) {
+    const rank = color === "white" ? "1" : "8";
+    const rookSquare = `${fileDelta > 0 ? "h" : "a"}${rank}` as Square;
+    const rook = game.get(rookSquare);
+    const path = fileDelta > 0 ? ["f", "g"] : ["d", "c"];
+    return (
+      move.from === `e${rank}` &&
+      Boolean(rook && rook.type === "r" && rook.color === piece.color) &&
+      path.every((file) => !game.get(`${file}${rank}` as Square))
+    );
+  }
+
+  const orthogonal = fileDelta === 0 || rankDelta === 0;
+  const diagonal = absFileDelta === absRankDelta;
+  const slides =
+    (piece.type === "q" && (orthogonal || diagonal)) ||
+    (piece.type === "r" && (fileDelta === 0 || rankDelta === 0)) ||
+    (piece.type === "b" && absFileDelta === absRankDelta);
+  const steps =
+    piece.type === "k" && Math.max(absFileDelta, absRankDelta) === 1;
+  if (!slides && !steps) return false;
+
+  const fileStep = Math.sign(fileDelta);
+  const rankStep = Math.sign(rankDelta);
+  let file = move.from.charCodeAt(0) + fileStep;
+  let rank = Number(move.from[1]) + rankStep;
+  while (`${String.fromCharCode(file)}${rank}` !== move.to) {
+    if (game.get(`${String.fromCharCode(file)}${rank}` as Square)) return false;
+    file += fileStep;
+    rank += rankStep;
+  }
+  return true;
 }
 
 export function GamePage({ live = false }: { live?: boolean }) {
@@ -129,6 +186,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const [fen, setFen] = useState("start");
   const [moveText, setMoveText] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
+  const [boardResetKey, setBoardResetKey] = useState(0);
   const [premoves, setPremoves] = useState<PendingMove[]>([]);
   const [optimisticMove, setOptimisticMove] = useState<OptimisticMove | null>(
     null,
@@ -170,6 +228,24 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const settingsRef = useRef(preferences.data ?? defaultSettings);
   settingsRef.current = preferences.data ?? defaultSettings;
   const hasClock = clock !== null;
+
+  useEffect(() => {
+    const resetBoardDrag = () => {
+      setBoardResetKey((key) => key + 1);
+      setSelected(null);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") resetBoardDrag();
+    };
+    window.addEventListener("blur", resetBoardDrag);
+    window.addEventListener("pointercancel", resetBoardDrag);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", resetBoardDrag);
+      window.removeEventListener("pointercancel", resetBoardDrag);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   function clearOptimisticMove() {
     if (optimisticMoveTimeout.current !== undefined) {
@@ -765,6 +841,17 @@ export function GamePage({ live = false }: { live?: boolean }) {
     if (selected) {
       const piece = new Chess(displayedFen).get(target);
       if (piece && piece.color === color[0]) {
+        const waitingForTurn = turn !== (color === "white" ? "w" : "b");
+        const premove = { from: selected, to: target };
+        if (
+          live &&
+          waitingForTurn &&
+          prefs.premovesEnabled &&
+          isLegalPremove(displayedFen, premove, color)
+        ) {
+          attemptMove(selected, target);
+          return;
+        }
         setSelected(target === selected ? null : target);
         return;
       }
@@ -892,6 +979,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
             )}
           </div>
           <ChessBoard
+            key={boardResetKey}
             {...boardOptions}
             palette={prefs.boardPalette}
             label="Chess board. Use drag and drop or click a piece and its destination."
