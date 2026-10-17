@@ -58,7 +58,8 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     validate: zodResolver(isLogin ? loginSchema : registerSchema),
   });
 
-  if (isAuthenticated) return <Navigate to={returnTo ?? "/play"} replace />;
+  if (isAuthenticated)
+    return <Navigate to={isLogin ? "/" : (returnTo ?? "/play")} replace />;
 
   async function submit(values: typeof form.values) {
     setSubmitting(true);

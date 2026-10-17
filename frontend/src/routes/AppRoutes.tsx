@@ -94,6 +94,17 @@ function RequireAuth() {
   return isAuthenticated ? <AppShell /> : <Navigate to="/login" replace />;
 }
 
+function LoginRoute() {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading)
+    return <main className="public-loading">Restoring your session…</main>;
+  return isAuthenticated ? (
+    <Navigate to="/" replace />
+  ) : (
+    <AuthPage mode="login" />
+  );
+}
+
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
   return (
@@ -113,7 +124,7 @@ export function AppRoutes() {
               )
             }
           />
-          <Route path="/login" element={<AuthPage mode="login" />} />
+          <Route path="/login" element={<LoginRoute />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route
             path="/forgot-password"
