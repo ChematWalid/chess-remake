@@ -195,19 +195,25 @@ export const challengeDetailSchema = z.object({
 });
 export type ChallengeDetail = z.infer<typeof challengeDetailSchema>;
 export const challengeEventSchema = z.object({
-  eventType: z.string(),
+  eventType: z.enum([
+    "INVITATION_RECEIVED",
+    "INVITATION_SENT",
+    "STATUS_CHANGED",
+    "MATCH_ASSIGNED",
+  ]),
   challengeId: z.number().int(),
   status: challengeStatusSchema,
   actorPublicUserId: z.string().uuid().nullable(),
-  otherUsername: z.string().optional(),
-  otherDisplayName: z.string().optional(),
-  roomCode: z.string().optional(),
-  color: z.enum(["WHITE", "BLACK"]).optional(),
-  connectUrl: z.string().optional(),
-  token: z.string().nullable().optional(),
-  initialTimeSeconds: z.number().int().nullable().optional(),
-  incrementSeconds: z.number().int().nullable().optional(),
-  message: z.string().optional(),
+  otherUsername: z.string().nullable(),
+  otherDisplayName: z.string().nullable(),
+  initialTimeSeconds: z.number().int().nullable(),
+  incrementSeconds: z.number().int().nullable(),
+  challengerSide: gameSideSchema,
+  roomCode: z.string().nullable(),
+  color: z.enum(["WHITE", "BLACK", "RANDOM"]).nullable(),
+  connectUrl: z.string().nullable(),
+  token: z.string().nullable(),
+  message: z.string().nullable(),
 });
 export type ChallengeEvent = z.infer<typeof challengeEventSchema>;
 
