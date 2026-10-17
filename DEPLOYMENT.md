@@ -22,7 +22,7 @@ From the repository root, create the private deployment environment file. The he
 
 Edit `.env.deploy`:
 
-- Set `APP_DOMAIN` to the ngrok HTTPS domain assigned to your account, without `https://` (for example, `your-name.ngrok-free.app`).
+- Set `APP_DOMAIN` to the ngrok HTTPS domain assigned to your account, without `https://` (for example, `your-name.ngrok-free.dev`).
 - Set `NGROK_AUTHTOKEN` to the token from your ngrok dashboard. Keep it private.
 - Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `APP_EMAIL_FROM` to your mail provider's values. For STARTTLS, the usual port is 587.
 - Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from Google Cloud. Add `https://YOUR_NGROK_DOMAIN/login/oauth2/code/google` as an authorized redirect URI.
