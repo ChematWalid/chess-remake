@@ -33,7 +33,6 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   const { data: settings = defaultSettings } = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
-    initialData: defaultSettings,
     enabled: isAuthenticated,
   });
   const settingsRef = useRef(settings);
