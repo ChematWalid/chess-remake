@@ -75,6 +75,13 @@ std::shared_ptr<GameRoom> RoomManager::createRoomWithIdentity(
 ) {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    if (rooms_.contains(roomCode)) {
+        if (hostSession) {
+            hostSession->send(Protocol::error("Room code is already in use"));
+        }
+        return nullptr;
+    }
+
     if (hostSession) {
         auto it = sessionToRoom_.find(hostSession->getId());
         if (it != sessionToRoom_.end()) {
