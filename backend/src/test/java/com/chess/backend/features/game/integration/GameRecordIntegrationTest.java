@@ -197,6 +197,19 @@ class GameRecordIntegrationTest {
     }
 
     @Test
+    void acceptedRoomExpiresWhenNeitherPlayerStartsIt() {
+        GameChallenge challenge = acceptedChallenge("ROOM09");
+        challenge.accept("ROOM09", GameSide.WHITE, clock.instant().minus(Duration.ofMinutes(3)));
+        challenge.markStarted(null);
+        challenges.save(challenge);
+
+        challengeService.expireNotStarted();
+
+        assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
+                .isEqualTo(ChallengeStatus.EXPIRED);
+    }
+
+    @Test
     void rejectsPlayerIdsThatDoNotMatchTheAcceptedRoom() throws Exception {
         GameChallenge challenge = acceptedChallenge("ROOM05");
         String payload = payload(challenge, "ROOM05", "ROOM05", false, "1")

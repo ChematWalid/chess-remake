@@ -375,6 +375,8 @@ bool RoomManager::handleTokenConnect(
             claims.displayName,
             webhookClient_
         );
+        room->setDisconnectGracePeriod(disconnectGracePeriod_);
+        room->setStartTimeout(roomStartTimeout_);
         rooms_[roomCode] = room;
         sessionToRoom_[session->getId()] = roomCode;
         return true;

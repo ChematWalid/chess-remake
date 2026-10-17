@@ -4,6 +4,8 @@
 #include "net/WebSocketServer.h"
 #include "net/JwtToken.h"
 #include <nlohmann/json.hpp>
+#include <chrono>
+#include <thread>
 #include <vector>
 #include <mutex>
 
@@ -489,6 +491,28 @@ TEST(RoomManagerTest, TokenAuthenticationAndIdentitySeating) {
     bool badOk = manager.handleTokenConnect(badSession, "TOK123", expiredToken);
     EXPECT_FALSE(badOk);
     EXPECT_EQ(badSession->lastJson()["event"], "error");
+}
+
+TEST(RoomManagerTest, TokenCreatedRoomUsesConfiguredStartTimeout) {
+    const std::string secret = "test-secret-key-start-window";
+    net::RoomManager manager(nullptr, secret, std::chrono::seconds(60), std::chrono::seconds(1));
+    net::PlayerToken claims;
+    claims.roomCode = "WAIT01";
+    claims.userId = "1001";
+    claims.displayName = "Waiting Player";
+    claims.color = "white";
+    claims.exp = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count() + 60;
+    auto session = std::make_shared<MockSession>("waiting-session");
+
+    ASSERT_TRUE(manager.handleTokenConnect(session, claims.roomCode, net::JwtToken::create(claims, secret)));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    manager.tickClocks();
+
+    auto room = manager.getRoom(claims.roomCode);
+    ASSERT_NE(room, nullptr);
+    EXPECT_EQ(room->getState(), net::RoomState::Finished);
+    EXPECT_TRUE(room->isDead());
 }
 
 /**
