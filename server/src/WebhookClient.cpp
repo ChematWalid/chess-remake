@@ -26,6 +26,9 @@ nlohmann::json GameRecordPayload::toJson() const {
     j["pgn"] = pgn;
     j["moves"] = moves;
     j["fens"] = fens;
+    j["gameType"] = gameType;
+    j["setupMoves"] = setupMoves;
+    j["setupFens"] = setupFens;
     return j;
 }
 

@@ -1,0 +1,129 @@
+import { Button, Checkbox, Group, Select, Stack, Text } from "@mantine/core";
+import { Chessboard } from "react-chessboard";
+import type { ChessboardOptions } from "react-chessboard";
+import { pieceToFen } from "../utils/positionUtils";
+import type { BoardPiece } from "../utils/positionUtils";
+
+const pieceLabels: Record<BoardPiece, string> = {
+  wK: "♔",
+  wQ: "♕",
+  wR: "♖",
+  wB: "♗",
+  wN: "♘",
+  wP: "♙",
+  bK: "♚",
+  bQ: "♛",
+  bR: "♜",
+  bB: "♝",
+  bN: "♞",
+  bP: "♟",
+};
+
+interface PositionBoardEditorProps {
+  mode: "MOVES" | "DIRECT";
+  fen: string;
+  selectedPiece: BoardPiece | null;
+  onFenChange: (fen: string) => void;
+  onPieceSelect: (piece: BoardPiece | null) => void;
+  onSquareClick: (square: string) => void;
+  onPieceDrop: ChessboardOptions["onPieceDrop"];
+}
+
+export function PositionBoardEditor({
+  mode,
+  fen,
+  selectedPiece,
+  onFenChange,
+  onPieceSelect,
+  onSquareClick,
+  onPieceDrop,
+}: PositionBoardEditorProps) {
+  const fields = fen.split(" ");
+  const castling = fields[2] ?? "-";
+
+  function updateCastling(right: string, enabled: boolean) {
+    const next = new Set(castling === "-" ? [] : castling);
+    if (enabled) next.add(right);
+    else next.delete(right);
+    fields[2] =
+      ["K", "Q", "k", "q"].filter((value) => next.has(value)).join("") || "-";
+    onFenChange(fields.join(" "));
+  }
+
+  const options: ChessboardOptions = {
+    position: fen,
+    allowDragging: true,
+    onPieceDrop,
+    onSquareClick: ({ square }) => onSquareClick(square),
+    boardOrientation: "white",
+    boardStyle: { width: "100%" },
+  };
+
+  return (
+    <Stack style={{ minWidth: 280, flex: 1 }}>
+      <div style={{ width: "min(100%, 440px)", marginInline: "auto" }}>
+        <Chessboard options={options} />
+      </div>
+      {mode === "DIRECT" ? (
+        <>
+          <Text size="sm">
+            Choose a piece, then choose a square. Select a square with no piece
+            selected to clear it.
+          </Text>
+          <Group gap="xs" aria-label="Choose a piece">
+            {Object.keys(pieceToFen).map((key) => {
+              const value = key as BoardPiece;
+              return (
+                <Button
+                  key={value}
+                  size="xs"
+                  aria-label={`Place ${value[0] === "w" ? "white" : "black"} ${value[1]}`}
+                  variant={selectedPiece === value ? "filled" : "default"}
+                  onClick={() => onPieceSelect(value)}
+                >
+                  {pieceLabels[value]}
+                </Button>
+              );
+            })}
+          </Group>
+          <Button
+            size="xs"
+            variant="default"
+            onClick={() => onPieceSelect(null)}
+          >
+            Erase pieces
+          </Button>
+          <Select
+            label="Side to move"
+            data={[
+              { value: "w", label: "White" },
+              { value: "b", label: "Black" },
+            ]}
+            value={fields[1]}
+            onChange={(value) => {
+              fields[1] = value ?? "w";
+              onFenChange(fields.join(" "));
+            }}
+            allowDeselect={false}
+          />
+          <Group gap="md" aria-label="Castling rights">
+            {["K", "Q", "k", "q"].map((right) => (
+              <Checkbox
+                key={right}
+                label={right}
+                checked={castling.includes(right)}
+                onChange={(event) =>
+                  updateCastling(right, event.currentTarget.checked)
+                }
+              />
+            ))}
+          </Group>
+        </>
+      ) : (
+        <Text size="sm">
+          Make legal moves on the board. The side to move follows the sequence.
+        </Text>
+      )}
+    </Stack>
+  );
+}

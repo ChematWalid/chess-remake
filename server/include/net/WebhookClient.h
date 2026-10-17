@@ -29,6 +29,9 @@ struct GameRecordPayload {
     std::string pgn;
     std::vector<std::string> moves;
     std::vector<std::string> fens;
+    std::string gameType{"STANDARD"};
+    std::vector<std::string> setupMoves;
+    std::vector<std::string> setupFens;
 
     [[nodiscard]] nlohmann::json toJson() const;
 };

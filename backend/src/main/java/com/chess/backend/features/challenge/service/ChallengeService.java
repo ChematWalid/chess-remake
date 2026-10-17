@@ -23,6 +23,8 @@ import com.chess.backend.features.challenge.exception.InvalidTimeControlExceptio
 import com.chess.backend.features.challenge.exception.SelfChallengeException;
 import com.chess.backend.features.challenge.repository.GameChallengeRepository;
 import com.chess.backend.features.challenge.util.RoomCodeGenerator;
+import com.chess.backend.features.position.validation.PositionValidator;
+import com.chess.backend.features.challenge.exception.InvalidChallengePositionException;
 import com.chess.backend.features.social.service.FriendService;
 import com.chess.backend.features.social.service.PresenceService;
 import com.chess.backend.features.user.domain.User;
@@ -30,6 +32,7 @@ import com.chess.backend.features.user.service.UserDirectory;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -76,12 +79,16 @@ public class ChallengeService {
         if (request.initialTimeSeconds() != null
                 && (request.initialTimeSeconds() > 2592000 || request.incrementSeconds() > 3600))
             throw new InvalidTimeControlException("Time control is outside supported bounds");
+        List<String> setupMoves = request.setupMoves() == null ? List.of() : request.setupMoves();
+        List<String> setupFens = request.setupFens() == null ? List.of() : request.setupFens();
+        String positionError = PositionValidator.validate(request.initialFen(), setupMoves, setupFens);
+        if (positionError != null) throw new InvalidChallengePositionException(positionError);
         Instant now = clock.instant();
         if (challenges.hasPendingBetween(challengerId, challenged.getId(), now, ChallengeStatus.PENDING))
             throw new ChallengeAlreadyPendingException("A challenge is already pending");
         GameSide side = request.challengerSide() == null ? GameSide.RANDOM : request.challengerSide();
         GameChallenge challenge = challenges.save(new GameChallenge(challenger, challenged, request.initialTimeSeconds(),
-                request.incrementSeconds(), side, now.plus(properties.invitationTtl())));
+                request.incrementSeconds(), side, request.initialFen(), setupMoves, setupFens, now.plus(properties.invitationTtl())));
         sendChallengeEvent(challenged.getId(), challenge, ChallengeEventType.INVITATION_RECEIVED,
                 challenger.getPublicId(), challenger.getUsername(), challenger.getDisplayName(), null);
         sendChallengeEvent(challenger.getId(), challenge, ChallengeEventType.INVITATION_SENT,
@@ -137,12 +144,12 @@ public class ChallengeService {
         String connectUrl = null;
         if (challenge.getStatus() == ChallengeStatus.ACCEPTED) {
             token = jwtService.createRoomToken(challenge.getRoomCode(), caller.getId(), caller.getDisplayName(), color,
-                    challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds());
+                    challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
             connectUrl = properties.engineWsUrl();
         }
         return new ChallengeDetail(challenge.getId(), challenge.getStatus(), opponent.getPublicId(), opponent.getUsername(),
                 challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getChallengerSide(), color,
-                challenge.getRoomCode(), connectUrl, token, challenge.getExpiresAt());
+                challenge.getRoomCode(), connectUrl, token, challenge.getExpiresAt(), challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
     }
 
     @Transactional
@@ -223,7 +230,7 @@ public class ChallengeService {
 
     private void sendMatch(GameChallenge challenge, User recipient, GameSide color) {
         String token = jwtService.createRoomToken(challenge.getRoomCode(), recipient.getId(), recipient.getDisplayName(), color,
-                challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds());
+                challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
         String url = properties.engineWsUrl();
         messages.publish(recipient.getId(), "/queue/challenges",
                 event(challenge, ChallengeEventType.MATCH_ASSIGNED, ChallengeStatus.ACCEPTED,
@@ -242,7 +249,7 @@ public class ChallengeService {
                                  String roomCode, String connectUrl, String token, String message) {
         return new ChallengeEvent(challenge.getId(), type, status, actorPublicId, username, displayName,
                 challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getChallengerSide(),
-                roomCode, color, connectUrl, token, message);
+                roomCode, color, connectUrl, token, message, challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
     }
 
     private UUID publicUserId(long userId) {
@@ -267,7 +274,7 @@ public class ChallengeService {
                     challenge.getChallenger().getUsername(), challenge.getChallenged().getPublicId(),
                     challenge.getChallenged().getUsername(), challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),
                     challenge.getChallengerSide(), playerColor(challenge, challenger), challenge.getRoomCode(),
-                    challenge.getCreatedAt(), challenge.getExpiresAt());
+                    challenge.getCreatedAt(), challenge.getExpiresAt(), challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
         }).toList();
         return new ChallengePage(items, page, size, result.getTotalElements());
     }

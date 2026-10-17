@@ -5,6 +5,8 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <vector>
+#include "chess/notation/Fen.h"
+#include "chess/rules/PositionValidator.h"
 
 namespace net {
 
@@ -193,11 +195,44 @@ std::optional<PlayerToken> JwtToken::verify(
     } else if (j.contains("increment_seconds") && j["increment_seconds"].is_number()) {
         pt.incrementSeconds = j["increment_seconds"].get<int64_t>();
     }
+    if (j.contains("initial_fen") && j["initial_fen"].is_string()) {
+        pt.initialFen = j["initial_fen"].get<std::string>();
+    }
+    if (j.contains("setup_moves") && j["setup_moves"].is_array()) {
+        for (const auto& move : j["setup_moves"]) {
+            if (!move.is_string()) return std::nullopt;
+            pt.setupMoves.push_back(move.get<std::string>());
+        }
+    }
+    if (j.contains("setup_fens") && j["setup_fens"].is_array()) {
+        for (const auto& fen : j["setup_fens"]) {
+            if (!fen.is_string()) return std::nullopt;
+            pt.setupFens.push_back(fen.get<std::string>());
+        }
+    }
 
     if (pt.roomCode.empty() || pt.userId.empty() || pt.displayName.empty()
             || (pt.color != "white" && pt.color != "black")
             || pt.initialSeconds < 0 || pt.incrementSeconds < 0) {
         return std::nullopt;
+    }
+
+    if (pt.setupMoves.size() > 300 || pt.setupFens.size() > 301) return std::nullopt;
+    if (pt.initialFen.empty()) {
+        if (!pt.setupMoves.empty() || !pt.setupFens.empty()) return std::nullopt;
+    } else {
+        if (pt.initialFen.size() > 128) return std::nullopt;
+        for (const auto& fen : pt.setupFens) {
+            if (fen.size() > 128) return std::nullopt;
+        }
+        try {
+            if (!chess::PositionValidator::isPlayable(chess::Fen::parse(pt.initialFen))
+                    || !chess::PositionValidator::replayMatches(pt.setupMoves, pt.setupFens, pt.initialFen)) {
+                return std::nullopt;
+            }
+        } catch (const std::exception&) {
+            return std::nullopt;
+        }
     }
 
     return pt;
@@ -216,6 +251,9 @@ std::string JwtToken::create(
     j["color"] = claims.color;
     j["initial_seconds"] = claims.initialSeconds;
     j["increment_seconds"] = claims.incrementSeconds;
+    if (!claims.initialFen.empty()) j["initial_fen"] = claims.initialFen;
+    j["setup_moves"] = claims.setupMoves;
+    j["setup_fens"] = claims.setupFens;
     j["exp"] = claims.exp;
 
     std::string headerB64 = base64UrlEncode(header);

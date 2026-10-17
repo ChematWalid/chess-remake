@@ -9,7 +9,7 @@ import {
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import {
   EmptyState,
@@ -27,6 +27,9 @@ import {
   type ChallengeRequest,
 } from "../../challenge/api/challengeApi";
 import { useRealtime } from "../../realtime/RealtimeContext";
+import { ChallengePositionPicker } from "../components/ChallengePositionPicker";
+import { ChallengePositionPreview } from "../components/ChallengePositionPreview";
+import type { ChallengePosition } from "../../position/utils/positionUtils";
 
 const timeOptions = [
   { value: "unlimited", label: "Untimed" },
@@ -41,6 +44,15 @@ const timeOptions = [
 
 export function PlayPage() {
   const [params] = useSearchParams();
+  const location = useLocation();
+  const seededPosition = (
+    location.state as { challengePosition?: ChallengePosition } | null
+  )?.challengePosition;
+  const [challengeMode, setChallengeMode] = useState<"STANDARD" | "CUSTOM">(
+    seededPosition ? "CUSTOM" : "STANDARD",
+  );
+  const [customPosition, setCustomPosition] =
+    useState<ChallengePosition | null>(seededPosition ?? null);
   const [opponent, setOpponent] = useState<string | null>(
     params.get("opponent"),
   );
@@ -110,10 +122,23 @@ export function PlayPage() {
       });
       return;
     }
+    if (challengeMode === "CUSTOM" && !customPosition) {
+      notifications.show({
+        title: "Choose a position",
+        message: "Set up a position before sending a custom challenge.",
+        color: "yellow",
+      });
+      return;
+    }
     const request: ChallengeRequest = {
       toUsername: opponent,
       challengerSide: side as ChallengeRequest["challengerSide"],
     };
+    if (challengeMode === "CUSTOM" && customPosition) {
+      request.initialFen = customPosition.fen;
+      request.setupMoves = customPosition.setupMoves;
+      request.setupFens = customPosition.setupFens;
+    }
     if (time === "custom") {
       request.initialTimeSeconds = Math.round(customMinutes * 60);
       request.incrementSeconds = increment;
@@ -201,6 +226,12 @@ export function PlayPage() {
                 data={friendOptions}
                 value={opponent}
                 onChange={setOpponent}
+              />
+              <ChallengePositionPicker
+                mode={challengeMode}
+                position={customPosition}
+                onModeChange={setChallengeMode}
+                onPositionChange={setCustomPosition}
               />
               <Select
                 label="Time control"
@@ -299,12 +330,12 @@ export function PlayPage() {
                     >
                       <div>
                         <Text fw={600}>{challenge.challengerUsername}</Text>
-                        <Text size="sm" c="dimmed">
-                          {challenge.initialTimeSeconds
-                            ? `${Math.floor(challenge.initialTimeSeconds / 60)}+${challenge.incrementSeconds ?? 0}`
-                            : "Untimed"}{" "}
-                          · {challenge.challengerSide.toLowerCase()}
-                        </Text>
+                        <ChallengePositionPreview
+                          fen={challenge.initialFen}
+                          challengerSide={challenge.challengerSide}
+                          initialTimeSeconds={challenge.initialTimeSeconds}
+                          incrementSeconds={challenge.incrementSeconds}
+                        />
                       </div>
                       <Group gap="xs">
                         <Button

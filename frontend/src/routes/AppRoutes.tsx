@@ -51,6 +51,11 @@ const PlayPage = lazy(() =>
     default: module.PlayPage,
   })),
 );
+const PositionSetupPage = lazy(() =>
+  import("../features/play/pages/PositionSetupPage").then((module) => ({
+    default: module.PositionSetupPage,
+  })),
+);
 const SearchPage = lazy(() =>
   import("../features/search/pages/SearchPage").then((module) => ({
     default: module.SearchPage,
@@ -133,6 +138,7 @@ export function AppRoutes() {
           <Route element={<RequireAuth />}>
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/play" element={<PlayPage />} />
+            <Route path="/position-setup" element={<PositionSetupPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
