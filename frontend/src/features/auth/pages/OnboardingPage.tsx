@@ -17,7 +17,7 @@ export function OnboardingPage() {
       username: (value) =>
         /^[a-zA-Z0-9_]{3,30}$/.test(value)
           ? null
-          : "Use 3–30 letters, numbers, or underscores.",
+          : "Use 3 to 30 letters, numbers, or underscores.",
     },
   });
   async function submit({ username }: { username: string }) {

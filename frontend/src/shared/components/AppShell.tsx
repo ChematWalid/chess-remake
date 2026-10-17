@@ -95,7 +95,7 @@ export function AppShell() {
               size="sm"
               aria-label="Toggle navigation"
             />
-            <Link to="/play" className="brand">
+            <Link to="/" className="brand">
               <IconChessKnight size={27} stroke={1.6} />
               <span>rook</span>
             </Link>
