@@ -13,6 +13,10 @@ npm run dev
 
 Vite serves the client on port `5173` and proxies `/api`, OAuth routes, and `/ws` to Spring Boot on port `8080`. Set `VITE_API_BASE_URL` in `.env` when the backend runs elsewhere; production deployments should point it at the public backend origin and configure backend CORS for the frontend origin. Configure Google OAuth and email delivery in the backend environment. Live games connect to the C++ URL returned by the accepted challenge API.
 
+## Production network configuration
+
+Set `VITE_API_BASE_URL` to the public Spring Boot origin (or route the API through the frontend origin). Set `APP_FRONTEND_URL` and `APP_CORS_ORIGINS` to the deployed frontend origin. Set `COOKIE_SECURE=true` when using HTTPS. Set `APP_ENGINE_WS_URL` to a publicly reachable `wss://` endpoint that a reverse proxy forwards to the C++ game server. The browser cannot connect to a server's `localhost`; the client only rewrites loopback engine URLs during local Vite development and displays a configuration error if one is returned in a production build. Keep both engine signing secrets and the internal webhook token in server-side environment configuration.
+
 ## Client workflows
 
 - Landing, registration, sign-in, Google OAuth, first-login username setup, email verification, and password reset.

@@ -102,7 +102,19 @@ export function GamePage({ live = false }: { live?: boolean }) {
         setFinished("This accepted game is no longer available.");
         return;
       }
-      const ws = new WebSocket(resolveEngineUrl(connection.connectUrl));
+      let engineUrl: string;
+      try {
+        engineUrl = resolveEngineUrl(connection.connectUrl);
+      } catch (error) {
+        setConnected(false);
+        setFinished(
+          error instanceof Error
+            ? error.message
+            : "The game server has no public WebSocket address.",
+        );
+        return;
+      }
+      const ws = new WebSocket(engineUrl);
       socket.current = ws;
       ws.onopen = () => {
         ws.send(JSON.stringify({
