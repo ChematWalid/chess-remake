@@ -19,6 +19,7 @@ import { ApiError } from "../../../shared/api/client";
 import type { AuthResponse } from "../../../shared/api/types";
 import { useAuth } from "../../../shared/auth/AuthProvider";
 import { login, register } from "../api/authApi";
+import { GoogleLogo } from "../components/GoogleLogo";
 import {
   consumeReturnPath,
   peekReturnPath,
@@ -180,6 +181,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
               onClick={() => storeReturnPath(returnTo)}
               variant="default"
               fullWidth
+              leftSection={<GoogleLogo />}
             >
               Continue with Google
             </Button>
