@@ -69,11 +69,19 @@ GameRoom::GameRoom(
     std::optional<chess::Color> preferredColor,
     std::string hostUserId,
     std::string hostDisplayName,
-    std::shared_ptr<WebhookClient> webhookClient
+    std::shared_ptr<WebhookClient> webhookClient,
+    std::string initialFen,
+    std::vector<std::string> setupMoves,
+    std::vector<std::string> setupFens
 )
     : roomCode_(std::move(roomCode)),
       timeControl_(timeControl),
       clock_(std::make_unique<chess::ChessClock>(timeControl_)),
+      game_(initialFen.empty() ? chess::ChessGame{} : chess::ChessGame(chess::Fen::parse(initialFen))),
+      customStart_(!initialFen.empty()),
+      initialFen_(initialFen.empty() ? chess::Fen::serialize(chess::Fen::standard()) : std::move(initialFen)),
+      setupMoves_(std::move(setupMoves)),
+      setupFens_(std::move(setupFens)),
       webhookClient_(std::move(webhookClient)) {
 
     chess::Color hostColor = chess::Color::White;
@@ -238,7 +246,7 @@ bool GameRoom::joinWithIdentity(
         state_ = RoomState::InProgress;
         startedAt_ = std::chrono::system_clock::now();
         if (!timeControl_.isUnlimited) {
-            clock_->start(chess::Color::White);
+            clock_->start(game_.position().sideToMove());
         }
 
         std::string fen = chess::Fen::serialize(game_.position());
@@ -246,7 +254,7 @@ bool GameRoom::joinWithIdentity(
         int64_t bMs = getRemainingTimeMs(chess::Color::Black);
 
         std::string startMsg = Protocol::gameStarted(
-            roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan()
+            roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan(), setupMoves_, setupFens_
         );
         if (whiteSession_) sendToSession(whiteSession_, startMsg);
         if (blackSession_) sendToSession(blackSession_, startMsg);
@@ -259,7 +267,7 @@ bool GameRoom::joinWithIdentity(
         int64_t bMs = getRemainingTimeMs(chess::Color::Black);
         sendToSession(
             session,
-            Protocol::gameStarted(roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan())
+            Protocol::gameStarted(roomCode_, fen, timeControl_, wMs, bMs, getAllMovesSan(), setupMoves_, setupFens_)
         );
     }
 
@@ -568,6 +576,9 @@ void GameRoom::finishGame(const std::string& resultStr,
         payload.pgn = pgn;
         payload.moves = getAllMovesSan();
         payload.fens = getAllFens();
+        payload.gameType = customStart_ ? "CUSTOM_START" : "STANDARD";
+        payload.setupMoves = setupMoves_;
+        payload.setupFens = setupFens_;
 
         try {
             webhookClient_->enqueue(payload);
@@ -602,7 +613,6 @@ void GameRoom::finishGameWithResult(const chess::GameResult& result) {
 }
 
 std::string GameRoom::buildPgn(const std::string& resultStr) const {
-    chess::SanNotation san;
     std::ostringstream oss;
 
     std::string utcDateTag = "1970.01.01";
@@ -625,25 +635,41 @@ std::string GameRoom::buildPgn(const std::string& resultStr) const {
     oss << "[White \"" << (whiteDisplayName_.empty() ? "White" : whiteDisplayName_) << "\"]\n";
     oss << "[Black \"" << (blackDisplayName_.empty() ? "Black" : blackDisplayName_) << "\"]\n";
     oss << "[Result \"" << resTag << "\"]\n";
+    if (!setupMoves_.empty()) {
+        oss << "[SetUp \"1\"]\n";
+        oss << "[FEN \"" << setupFens_.front() << "\"]\n";
+    } else if (initialFen_ != chess::Fen::serialize(chess::Fen::standard())) {
+        oss << "[SetUp \"1\"]\n";
+        oss << "[FEN \"" << initialFen_ << "\"]\n";
+    }
 
     if (timeControl_.isUnlimited) {
-        oss << "[TimeControl \"-\"]\n\n";
+        oss << "[TimeControl \"-\"]\n";
     } else {
         int64_t initSec = timeControl_.initialTime.count() / 1000;
         int64_t incSec = timeControl_.increment.count() / 1000;
-        oss << "[TimeControl \"" << initSec << "+" << incSec << "\"]\n\n";
+        oss << "[TimeControl \"" << initSec << "+" << incSec << "\"]\n";
     }
 
-    const auto& positions = game_.positionHistory();
-    const auto& moves = game_.movesHistory();
-    for (size_t i = 0; i < moves.size(); ++i) {
-        if (i % 2 == 0) {
-            oss << (i / 2 + 1) << ". ";
+    oss << "\n";
+    const auto pgnStartFen = setupMoves_.empty() ? initialFen_ : setupFens_.front();
+    const auto pgnStartPosition = chess::Fen::parse(pgnStartFen);
+    auto sideToMove = pgnStartPosition.sideToMove();
+    auto fullmoveNumber = pgnStartPosition.fullmoveNumber();
+    bool firstMove = true;
+    auto appendMove = [&](const std::string& sanMove) {
+        if (sideToMove == chess::Color::White) {
+            oss << fullmoveNumber << ". ";
+        } else if (firstMove) {
+            oss << fullmoveNumber << "... ";
         }
-        if (i < positions.size()) {
-            oss << san.serialize(positions[i], moves[i]) << " ";
-        }
-    }
+        oss << sanMove << " ";
+        firstMove = false;
+        if (sideToMove == chess::Color::Black) ++fullmoveNumber;
+        sideToMove = sideToMove == chess::Color::White ? chess::Color::Black : chess::Color::White;
+    };
+    for (const auto& setupMove : setupMoves_) appendMove(setupMove);
+    for (const auto& move : getAllMovesSan()) appendMove(move);
     oss << resTag;
     return oss.str();
 }

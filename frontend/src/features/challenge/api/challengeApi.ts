@@ -13,6 +13,9 @@ export type ChallengeRequest = {
   challengerSide: "WHITE" | "BLACK" | "RANDOM";
   initialTimeSeconds?: number;
   incrementSeconds?: number;
+  initialFen?: string;
+  setupMoves?: string[];
+  setupFens?: string[];
 };
 export async function getIncomingChallenges(): Promise<Page<ChallengeSummary>> {
   return apiGet(

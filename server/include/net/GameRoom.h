@@ -36,7 +36,10 @@ public:
         std::optional<chess::Color> preferredColor = std::nullopt,
         std::string hostUserId = "",
         std::string hostDisplayName = "",
-        std::shared_ptr<WebhookClient> webhookClient = nullptr
+        std::shared_ptr<WebhookClient> webhookClient = nullptr,
+        std::string initialFen = "",
+        std::vector<std::string> setupMoves = {},
+        std::vector<std::string> setupFens = {}
     );
 
     ~GameRoom() = default;
@@ -136,6 +139,10 @@ private:
     TimeControl timeControl_;
     std::unique_ptr<chess::ChessClock> clock_;
     chess::ChessGame game_;
+    bool customStart_{false};
+    std::string initialFen_;
+    std::vector<std::string> setupMoves_;
+    std::vector<std::string> setupFens_;
 
     std::shared_ptr<IClientSession> whiteSession_;
     std::shared_ptr<IClientSession> blackSession_;

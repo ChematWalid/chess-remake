@@ -14,8 +14,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.JdbcType;
-import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "user_settings")
@@ -27,19 +27,19 @@ public class UserSettings {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
     @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "board_palette", nullable = false, columnDefinition = "board_palette")
     private BoardPalette boardPalette = BoardPalette.FOREST;
     @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "board_orientation", nullable = false, columnDefinition = "board_orientation")
     private BoardOrientation boardOrientation = BoardOrientation.AUTO;
     @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "motion_preference", nullable = false, columnDefinition = "motion_preference")
     private MotionPreference motionPreference = MotionPreference.SYSTEM;
     @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "theme_preference", nullable = false, columnDefinition = "theme_preference")
     private ThemePreference themePreference = ThemePreference.DARK;
     @Column(name = "show_coordinates", nullable = false)

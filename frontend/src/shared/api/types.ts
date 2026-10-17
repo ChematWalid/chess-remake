@@ -118,6 +118,7 @@ export const gameSummarySchema = z.object({
   terminationReason: z.string(),
   totalMoves: z.number().int(),
   playedAt: z.string(),
+  gameType: z.string().default("STANDARD"),
 });
 export type GameSummary = z.infer<typeof gameSummarySchema>;
 export const gameDetailSchema = z.object({
@@ -125,6 +126,9 @@ export const gameDetailSchema = z.object({
   pgn: z.string(),
   moves: z.array(z.string()),
   fens: z.array(z.string()),
+  gameType: z.string().default("STANDARD"),
+  setupMoves: z.array(z.string()).default([]),
+  setupFens: z.array(z.string()).default([]),
   initialTimeSeconds: z.number().int().nullable(),
   incrementSeconds: z.number().int().nullable(),
   durationSeconds: z.number().int(),
@@ -175,6 +179,9 @@ export const challengeSummarySchema = z.object({
   challengerSide: gameSideSchema,
   playerColor: gameSideSchema.nullable(),
   roomCode: z.string().nullable(),
+  initialFen: z.string().nullable().optional(),
+  setupMoves: z.array(z.string()).default([]),
+  setupFens: z.array(z.string()).default([]),
   createdAt: z.string(),
   expiresAt: z.string(),
 });
@@ -189,6 +196,9 @@ export const challengeDetailSchema = z.object({
   challengerSide: gameSideSchema,
   playerColor: z.enum(["WHITE", "BLACK"]).nullable(),
   roomCode: z.string().nullable(),
+  initialFen: z.string().nullable().optional(),
+  setupMoves: z.array(z.string()).default([]),
+  setupFens: z.array(z.string()).default([]),
   connectUrl: z.string().nullable(),
   token: z.string().nullable(),
   expiresAt: z.string(),
@@ -214,6 +224,9 @@ export const challengeEventSchema = z.object({
   connectUrl: z.string().nullable(),
   token: z.string().nullable(),
   message: z.string().nullable(),
+  initialFen: z.string().nullable().optional(),
+  setupMoves: z.array(z.string()).default([]),
+  setupFens: z.array(z.string()).default([]),
 });
 export type ChallengeEvent = z.infer<typeof challengeEventSchema>;
 

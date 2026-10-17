@@ -1,6 +1,6 @@
 # Chess backend
 
-Spring Boot 3 and Java 21 backend for authentication, profiles, searchable users, friends, challenges, presence, avatar storage, and archived chess games. Persistence uses Hibernate/JPA entities and Spring Data repositories; Flyway owns schema changes. REST JSON responses use `AppResponse<T>` and centralized error handling.
+Spring Boot 4.1 and Java 21 backend for authentication, profiles, searchable users, friends, challenges, presence, avatar storage, and archived chess games. Persistence uses Hibernate/JPA entities and Spring Data repositories; Flyway owns schema changes. REST JSON responses use `AppResponse<T>` and centralized error handling.
 
 ## Feature structure
 

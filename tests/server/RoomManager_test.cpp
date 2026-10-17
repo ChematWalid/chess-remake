@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include "chess/notation/Fen.h"
+#include "chess/rules/MoveGenerator.h"
 #include "net/RoomManager.h"
 #include "net/Protocol.h"
 #include "net/WebSocketServer.h"
@@ -588,6 +590,37 @@ TEST(RoomManagerTest, PgnSevenTagRosterAndDurationTracking) {
     EXPECT_NE(pgn.find("[Black \"BobMaster\"]"), std::string::npos);
     EXPECT_NE(pgn.find("[Result \"0-1\"]"), std::string::npos);
     EXPECT_NE(pgn.find("[TimeControl \"300+5\"]"), std::string::npos);
+}
+
+TEST(RoomManagerTest, StartsFromCustomPositionAndKeepsSetupMovesInPgn) {
+    const auto start = chess::Fen::standard();
+    const auto setupMove = chess::MoveGenerator::resolve(start, chess::Square(4, 1), chess::Square(4, 3));
+    ASSERT_TRUE(setupMove.has_value());
+    const auto customStart = start.after(*setupMove);
+    const std::string startFen = chess::Fen::serialize(start);
+    const std::string customFen = chess::Fen::serialize(customStart);
+
+    auto white = std::make_shared<MockSession>("w-custom");
+    auto black = std::make_shared<MockSession>("b-custom");
+    net::GameRoom room("CUS001", white, chess::ChessClock::TimeControl::unlimited(), chess::Color::White,
+            "user_w", "Alice", nullptr, customFen, {"e4"}, {startFen, customFen});
+    ASSERT_TRUE(room.joinWithIdentity(black, "user_b", "Bob", "black"));
+
+    const auto startMessage = white->lastJson();
+    EXPECT_EQ(startMessage["event"], "game_started");
+    EXPECT_EQ(startMessage["fen"], customFen);
+    EXPECT_EQ(startMessage["setup_moves"], nlohmann::json({"e4"}));
+
+    room.handleMove("w-custom", "e4");
+    room.handleMove("b-custom", "e5");
+    room.handleResign("w-custom");
+
+    const auto gameOver = white->lastJson();
+    EXPECT_EQ(gameOver["event"], "game_over");
+    const std::string pgn = gameOver["pgn"].get<std::string>();
+    EXPECT_NE(pgn.find("[SetUp \"1\"]"), std::string::npos);
+    EXPECT_NE(pgn.find("[FEN \"" + startFen + "\"]"), std::string::npos);
+    EXPECT_NE(pgn.find("1. e4 e5"), std::string::npos);
 }
 
 /**

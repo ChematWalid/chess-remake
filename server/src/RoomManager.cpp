@@ -373,7 +373,10 @@ bool RoomManager::handleTokenConnect(
             prefColor,
             claims.userId,
             claims.displayName,
-            webhookClient_
+            webhookClient_,
+            claims.initialFen,
+            claims.setupMoves,
+            claims.setupFens
         );
         room->setDisconnectGracePeriod(disconnectGracePeriod_);
         room->setStartTimeout(roomStartTimeout_);

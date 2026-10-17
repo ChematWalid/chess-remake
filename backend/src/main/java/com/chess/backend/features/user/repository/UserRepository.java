@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsernameIgnoreCase(String username);
     Optional<User> findByPublicId(UUID publicId);
     Optional<User> findByEmailIgnoreCase(String email);
+
+    @Modifying
+    @Query("update User user set user.totalGames = user.totalGames + 1, "
+            + "user.wins = user.wins + :wins, user.losses = user.losses + :losses, "
+            + "user.draws = user.draws + :draws where user.id = :userId")
+    int recordGameResult(@Param("userId") long userId, @Param("wins") int wins,
+                         @Param("losses") int losses, @Param("draws") int draws);
 
     @Query("""
             select user from User user

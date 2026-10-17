@@ -39,6 +39,9 @@ public class GameHistory {
     @Column(nullable = false, columnDefinition = "text") private String pgn;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "moves_history", nullable = false, columnDefinition = "jsonb") private List<String> moves;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "fens_history", nullable = false, columnDefinition = "jsonb") private List<String> fens;
+    @Column(name = "game_type", nullable = false, length = 30) private String gameType;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "setup_moves", nullable = false, columnDefinition = "jsonb") private List<String> setupMoves;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "setup_fens", nullable = false, columnDefinition = "jsonb") private List<String> setupFens;
     @Column(name = "played_at", nullable = false) private Instant playedAt;
     @Column(name = "duration_seconds", nullable = false) private int durationSeconds;
 
@@ -46,12 +49,14 @@ public class GameHistory {
     public GameHistory(GameChallenge challenge, String roomCode, User whitePlayer, User blackPlayer,
                        String whiteUsernameSnapshot, String blackUsernameSnapshot, User winner, boolean draw,
                        TerminationReason terminationReason, Integer initialTimeSeconds, Integer incrementSeconds,
-                       int totalMoves, String pgn, List<String> moves, List<String> fens, Instant playedAt, int durationSeconds) {
+                       int totalMoves, String pgn, List<String> moves, List<String> fens, String gameType,
+                       List<String> setupMoves, List<String> setupFens, Instant playedAt, int durationSeconds) {
         this.challenge = challenge; this.roomCode = roomCode; this.whitePlayer = whitePlayer; this.blackPlayer = blackPlayer;
         this.whiteUsernameSnapshot = whiteUsernameSnapshot; this.blackUsernameSnapshot = blackUsernameSnapshot;
         this.winner = winner; this.draw = draw; this.terminationReason = terminationReason;
         this.initialTimeSeconds = initialTimeSeconds; this.incrementSeconds = incrementSeconds;
         this.totalMoves = totalMoves; this.pgn = pgn; this.moves = moves; this.fens = fens;
+        this.gameType = gameType; this.setupMoves = setupMoves; this.setupFens = setupFens;
         this.playedAt = playedAt; this.durationSeconds = durationSeconds;
     }
     public Long getId() { return id; }
@@ -70,6 +75,9 @@ public class GameHistory {
     public String getPgn() { return pgn; }
     public List<String> getMoves() { return moves; }
     public List<String> getFens() { return fens; }
+    public String getGameType() { return gameType; }
+    public List<String> getSetupMoves() { return setupMoves; }
+    public List<String> getSetupFens() { return setupFens; }
     public Instant getPlayedAt() { return playedAt; }
     public int getDurationSeconds() { return durationSeconds; }
 }

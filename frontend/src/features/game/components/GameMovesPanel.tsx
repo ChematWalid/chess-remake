@@ -19,6 +19,7 @@ interface GameMovesPanelProps {
   onPremoveRemove: (index: number) => void;
   onPremovesClear: () => void;
   replay: GameDetail | null;
+  onChallengeFromPosition: () => void;
   index: number;
   playing: boolean;
   onIndexChange: (index: number) => void;
@@ -33,6 +34,7 @@ export function GameMovesPanel({
   onPremoveRemove,
   onPremovesClear,
   replay,
+  onChallengeFromPosition,
   index,
   playing,
   onIndexChange,
@@ -74,6 +76,14 @@ export function GameMovesPanel({
               {index}/{replay.moves.length}
             </Text>
           </Group>
+          <Button
+            fullWidth
+            variant="light"
+            mt="sm"
+            onClick={onChallengeFromPosition}
+          >
+            Challenge from this position
+          </Button>
           <Group mt="sm" justify="center">
             <Tooltip label="First position">
               <ActionIcon

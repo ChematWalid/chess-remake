@@ -12,4 +12,6 @@ public record GameRecordRequest(@NotBlank String roomCode, @NotBlank String whit
                                 @NotBlank String blackPlayerId, String winnerPlayerId, @NotNull Boolean isDraw,
                                 @NotBlank String terminationReason, @JsonAlias("reason_code") String reasonCode,
                                 @PositiveOrZero int totalMoves, @PositiveOrZero int durationSeconds, @NotBlank String pgn,
-                                @NotNull List<@NotBlank String> moves, @NotNull List<@NotBlank String> fens) { }
+                                @NotNull List<@NotBlank String> moves, @NotNull List<@NotBlank String> fens,
+                                String gameType, List<@NotBlank String> setupMoves,
+                                List<@NotBlank String> setupFens) { }

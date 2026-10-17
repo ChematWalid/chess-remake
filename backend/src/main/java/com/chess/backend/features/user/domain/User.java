@@ -10,8 +10,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import com.chess.backend.common.domain.enums.UserRole;
 import com.chess.backend.features.game.domain.enums.GameResult;
-import org.hibernate.annotations.JdbcType;
-import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -30,7 +30,7 @@ public class User {
     @Column(name = "email_verified", nullable = false) private boolean emailVerified;
     @Column(nullable = false) private boolean searchable = true;
     @Enumerated(EnumType.STRING)
-    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, columnDefinition = "user_role")
     private UserRole role = UserRole.ROLE_USER;
     @Column(name = "onboarding_complete", nullable = false) private boolean onboardingComplete = true;

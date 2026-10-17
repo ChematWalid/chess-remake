@@ -114,6 +114,15 @@ public class GameHistoryService {
             throw new GameRoomMismatchException("Game players do not match the room assignment");
         if (request.totalMoves() != request.moves().size() || request.fens().size() != request.moves().size() + 1)
             throw new InvalidReplayDataException("Game replay data is inconsistent");
+        List<String> setupMoves = request.setupMoves() == null ? List.of() : request.setupMoves();
+        List<String> setupFens = request.setupFens() == null ? List.of() : request.setupFens();
+        String gameType = challenge.getInitialFen() == null ? "STANDARD" : "CUSTOM_START";
+        if (!setupMoves.equals(challenge.getSetupMoves()) || !setupFens.equals(challenge.getSetupFens())
+                || (request.gameType() != null && !gameType.equals(request.gameType())))
+            throw new InvalidReplayDataException("Game setup data does not match the accepted challenge");
+        if ((!setupMoves.isEmpty() && setupFens.size() != setupMoves.size() + 1)
+                || (setupMoves.isEmpty() && !setupFens.isEmpty()))
+            throw new InvalidReplayDataException("Game setup replay data is inconsistent");
         User winner = request.winnerPlayerId() == null ? null : findWinner(request.winnerPlayerId());
         if (winner != null && !winner.getId().equals(white.getId()) && !winner.getId().equals(black.getId()))
             throw new InvalidWinnerException("Winner is not a player in this game");
@@ -121,10 +130,18 @@ public class GameHistoryService {
         TerminationReason reason = normalizeReason(request.reasonCode() == null ? request.terminationReason() : request.reasonCode());
         GameHistory saved = histories.save(new GameHistory(challenge, request.roomCode(), white, black, white.getUsername(), black.getUsername(),
                 winner, request.isDraw(), reason, challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),
-                request.totalMoves(), request.pgn(), request.moves(), request.fens(), clock.instant(), request.durationSeconds()));
-        if (request.isDraw()) { white.recordResult(GameResult.DRAW); black.recordResult(GameResult.DRAW); }
-        else if (winner.getId().equals(white.getId())) { white.recordResult(GameResult.WIN); black.recordResult(GameResult.LOSS); }
-        else { black.recordResult(GameResult.WIN); white.recordResult(GameResult.LOSS); }
+                request.totalMoves(), request.pgn(), request.moves(), request.fens(), gameType,
+                setupMoves, setupFens, clock.instant(), request.durationSeconds()));
+        if (request.isDraw()) {
+            users.recordGameResult(white.getId(), GameResult.DRAW);
+            users.recordGameResult(black.getId(), GameResult.DRAW);
+        } else if (winner.getId().equals(white.getId())) {
+            users.recordGameResult(white.getId(), GameResult.WIN);
+            users.recordGameResult(black.getId(), GameResult.LOSS);
+        } else {
+            users.recordGameResult(black.getId(), GameResult.WIN);
+            users.recordGameResult(white.getId(), GameResult.LOSS);
+        }
         challenges.complete(challenge);
         eventPublisher.publishEvent(new GameRecordedEvent(saved.getId(), white.getId(), black.getId()));
         return true;
@@ -183,12 +200,13 @@ public class GameHistoryService {
         UUID blackPublicUserId = game.getBlackPlayer() == null ? null : game.getBlackPlayer().getPublicId();
         UUID winnerPublicUserId = game.getWinner() == null ? null : game.getWinner().getPublicId();
         return new GameSummary(game.getId(), whiteUsername, blackUsername, game.isDraw(), whitePublicUserId,
-                blackPublicUserId, winnerPublicUserId, game.getTerminationReason().name(), game.getTotalMoves(), game.getPlayedAt());
+                blackPublicUserId, winnerPublicUserId, game.getTerminationReason().name(), game.getTotalMoves(), game.getPlayedAt(), game.getGameType());
     }
 
     private static GameDetail toDetail(GameHistory game) {
         return new GameDetail(toSummary(game), game.getPgn(), game.getMoves(), game.getFens(),
-                game.getInitialTimeSeconds(), game.getIncrementSeconds(), game.getDurationSeconds());
+                game.getInitialTimeSeconds(), game.getIncrementSeconds(), game.getDurationSeconds(),
+                game.getGameType(), game.getSetupMoves(), game.getSetupFens());
     }
     private static boolean constantTimeEquals(String expected, String actual) {
         return actual != null && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));

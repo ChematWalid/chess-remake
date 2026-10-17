@@ -3,7 +3,7 @@ import { IconDownload } from "@tabler/icons-react";
 import { Chess, type Square } from "chess.js";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import type { ChessboardOptions } from "react-chessboard";
 import type { ChallengeDetail, GameDetail } from "../../../shared/api/types";
@@ -31,6 +31,8 @@ interface EngineEvent {
   uci?: string;
   san?: string;
   moves?: string[];
+  setup_moves?: string[];
+  setup_fens?: string[];
   side_to_move?: "white" | "black";
   white_time_ms?: number;
   black_time_ms?: number;
@@ -121,6 +123,7 @@ function isLegalPremove(
 export function GamePage({ live = false }: { live?: boolean }) {
   const { id = "0", challengeId = "0" } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [fen, setFen] = useState("start");
   const [moveText, setMoveText] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
@@ -272,7 +275,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
             clearOptimisticMove();
             setConnected(true);
             setFen(event.fen);
-            setMoveText(event.moves ?? []);
+            setMoveText([...(event.setup_moves ?? []), ...(event.moves ?? [])]);
             setClock({
               white: event.white_time_ms ?? 0,
               black: event.black_time_ms ?? 0,
@@ -415,7 +418,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
 
   useEffect(() => {
     if (!playing || !detail.data || !("fens" in detail.data)) return;
-    const totalPositions = detail.data.fens.length;
+    const totalPositions = detail.data.setupMoves.length
+      ? detail.data.setupFens.length + detail.data.fens.length - 1
+      : detail.data.fens.length;
     const timer = window.setInterval(
       () =>
         setIndex((current) =>
@@ -428,7 +433,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
 
   useEffect(() => {
     if (live || !detail.data || !("moves" in detail.data)) return;
-    const moveCount = detail.data.moves.length;
+    const moveCount = detail.data.moves.length + detail.data.setupMoves.length;
 
     const handleReviewKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
@@ -457,10 +462,19 @@ export function GamePage({ live = false }: { live?: boolean }) {
     return () => window.removeEventListener("keydown", handleReviewKeyDown);
   }, [live, detail.data, index]);
 
-  const replay =
+  const replayRecord =
     !live && detail.data && "summary" in detail.data
       ? (detail.data as GameDetail)
       : null;
+  const replay = replayRecord
+    ? {
+        ...replayRecord,
+        moves: [...replayRecord.setupMoves, ...replayRecord.moves],
+        fens: replayRecord.setupMoves.length
+          ? [...replayRecord.setupFens, ...replayRecord.fens.slice(1)]
+          : replayRecord.fens,
+      }
+    : null;
   const opponentUsername =
     live && detail.data && "opponentUsername" in detail.data
       ? detail.data.opponentUsername
@@ -910,6 +924,17 @@ export function GamePage({ live = false }: { live?: boolean }) {
           onPremoveRemove={removePremove}
           onPremovesClear={clearPremoves}
           replay={replay}
+          onChallengeFromPosition={() =>
+            navigate("/play", {
+              state: {
+                challengePosition: {
+                  fen: currentFen,
+                  setupMoves: [],
+                  setupFens: [],
+                },
+              },
+            })
+          }
           index={index}
           playing={playing}
           onIndexChange={setIndex}

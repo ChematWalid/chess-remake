@@ -47,7 +47,9 @@ public:
         const TimeControl& timeControl,
         int64_t whiteTimeMs,
         int64_t blackTimeMs,
-        const std::vector<std::string>& moves
+        const std::vector<std::string>& moves,
+        const std::vector<std::string>& setupMoves = {},
+        const std::vector<std::string>& setupFens = {}
     );
 
     /**

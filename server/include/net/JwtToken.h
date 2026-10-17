@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace net {
 
@@ -17,6 +18,9 @@ struct PlayerToken {
     int64_t initialSeconds{0};
     int64_t incrementSeconds{0};
     int64_t exp{0};
+    std::string initialFen;
+    std::vector<std::string> setupMoves;
+    std::vector<std::string> setupFens;
 };
 
 /**
