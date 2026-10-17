@@ -5,3 +5,11 @@
 .game-player-identity-copy {
   min-width: 0;
 }
+.game-player-identity--active {
+  border-radius: 8px;
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.game-player-identity-turn {
+  color: var(--accent);
+}
