@@ -22,6 +22,10 @@ http://{$APP_DOMAIN} {
 		reverse_proxy backend:8080
 	}
 
+	handle /oauth2/redirect {
+		reverse_proxy frontend:80
+	}
+
 	handle /oauth2/* {
 		reverse_proxy backend:8080
 	}
