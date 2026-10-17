@@ -26,13 +26,14 @@ The REST API is described by OpenAPI at `/v3/api-docs` and the interactive Swagg
 | `POST /api/auth/oauth/onboarding` | Onboarding access token | `username`; completes first-login OAuth onboarding. |
 | `GET /api/users/me` | User | Current profile and stats. |
 | `PUT /api/users/me` | User | Optional `username`, `displayName`, `bio`, `searchable`. |
-| `GET /api/users/me/settings` | User | Read this account's cross-device board, motion, input, and notification preferences. |
-| `PUT /api/users/me/settings` | User | Replace preferences using typed enums for `boardPalette`, `boardOrientation`, and `motionPreference`, plus boolean controls. |
+| `GET /api/users/me/settings` | User | Read this account's cross-device theme, board, motion, input, and notification preferences. |
+| `PUT /api/users/me/settings` | User | Replace preferences using typed enums for `themePreference`, `boardPalette`, `boardOrientation`, and `motionPreference`, plus boolean controls. |
 | `POST /api/users/me/avatar` | User | Multipart field `file`; PNG, JPEG, or WEBP up to configured size. |
 | `GET /api/users/{publicId}/avatar` | Public | Avatar bytes; use returned `avatarUrl` values. |
 | `GET /api/users/{username}/profile` | User | Publicly visible profile and stats. |
 | `GET /api/users/search?q={query}&page=0&size=10` | User | Search verified, searchable users by username prefix or display-name substring. |
 | `GET /api/friends` | User | Accepted friends and presence state. |
+| `GET /api/friends/blocked` | User | Accounts blocked by the current user, including the IDs needed by the unblock action. |
 | `GET /api/friends/requests/incoming` | User | Incoming requests. |
 | `GET /api/friends/requests/outgoing` | User | Outgoing pending and declined requests, each with its status. Accepted requests appear in the friend list. |
 | `POST /api/friends/request/{username}` | User | Send a request. A reciprocal pending request is accepted. |
@@ -75,4 +76,4 @@ Google OAuth starts at `/oauth2/authorization/google`. The backend redirects to 
 
 ## Local setup and integration readiness
 
-Start PostgreSQL, MinIO, Mailpit, and the backend with `docker compose up --build` from `backend/`. Copy `.env.example` to `.env`; configure strong distinct JWT/internal secrets and real Google credentials for provider sign-in. Email links go to Mailpit. Point the C++ server at `/api/internal/games/record` and set its webhook and JWT secrets to match. The backend does not include a frontend; a future client can use this document and the OpenAPI schema as its contract.
+Start PostgreSQL, MinIO, Mailpit, and the backend with `docker compose up --build` from `backend/`. Copy `.env.example` to `.env`; configure strong distinct JWT/internal secrets and real Google credentials for provider sign-in. Email links go to Mailpit. Point the C++ server at `/api/internal/games/record` and set its webhook and JWT secrets to match. The React client lives in `frontend/`; see its README for local startup and supported workflows.

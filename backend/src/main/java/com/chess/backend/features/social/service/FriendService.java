@@ -59,6 +59,14 @@ public class FriendService {
         }).toList();
     }
     @Transactional(readOnly = true)
+    public List<FriendSummary> blocked(long userId) {
+        return friendships.findForUser(userId, FriendshipStatus.BLOCKED).stream()
+                .filter(f -> f.getRequester().getId() == userId)
+                .map(f -> new FriendSummary(f.getAddressee().getPublicId(), f.getAddressee().getId(),
+                        f.getAddressee().getUsername(), f.getAddressee().getDisplayName()))
+                .toList();
+    }
+    @Transactional(readOnly = true)
     public List<FriendRequestSummary> incoming(long userId) {
         return mapRequests(friendships.incoming(userId, FriendshipStatus.PENDING), true);
     }

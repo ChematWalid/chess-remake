@@ -43,6 +43,12 @@ public class FriendController {
                 "/api/users/" + friend.publicUserId() + "/avatar", presence.status(friend.userId()))).toList();
     }
 
+    @GetMapping("/blocked")
+    List<FriendView> blocked(@AuthenticationPrincipal ChessPrincipal principal) {
+        return service.blocked(principal.userId()).stream().map(user -> new FriendView(user.publicUserId(),
+                user.username(), user.displayName(), "/api/users/" + user.publicUserId() + "/avatar", presence.status(user.userId()))).toList();
+    }
+
     @GetMapping("/requests/incoming")
     List<FriendRequestView> incoming(@AuthenticationPrincipal ChessPrincipal principal) {
         return service.incoming(principal.userId()).stream().map(FriendController::mapRequest).toList();

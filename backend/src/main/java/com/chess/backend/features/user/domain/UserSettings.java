@@ -3,6 +3,7 @@ package com.chess.backend.features.user.domain;
 import com.chess.backend.features.user.domain.enums.BoardOrientation;
 import com.chess.backend.features.user.domain.enums.BoardPalette;
 import com.chess.backend.features.user.domain.enums.MotionPreference;
+import com.chess.backend.features.user.domain.enums.ThemePreference;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,6 +38,10 @@ public class UserSettings {
     @JdbcType(PostgreSQLEnumJdbcType.class)
     @Column(name = "motion_preference", nullable = false, columnDefinition = "motion_preference")
     private MotionPreference motionPreference = MotionPreference.SYSTEM;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(name = "theme_preference", nullable = false, columnDefinition = "theme_preference")
+    private ThemePreference themePreference = ThemePreference.DARK;
     @Column(name = "show_coordinates", nullable = false)
     private boolean showCoordinates = true;
     @Column(name = "show_legal_move_hints", nullable = false)
@@ -58,6 +63,7 @@ public class UserSettings {
     public BoardPalette getBoardPalette() { return boardPalette; }
     public BoardOrientation getBoardOrientation() { return boardOrientation; }
     public MotionPreference getMotionPreference() { return motionPreference; }
+    public ThemePreference getThemePreference() { return themePreference; }
     public boolean isShowCoordinates() { return showCoordinates; }
     public boolean isShowLegalMoveHints() { return showLegalMoveHints; }
     public boolean isPremovesEnabled() { return premovesEnabled; }
@@ -66,12 +72,13 @@ public class UserSettings {
     public boolean isInAppNotificationsEnabled() { return inAppNotificationsEnabled; }
     public boolean isNotificationSoundsEnabled() { return notificationSoundsEnabled; }
 
-    public void update(BoardPalette palette, BoardOrientation orientation, MotionPreference motion,
+    public void update(BoardPalette palette, BoardOrientation orientation, MotionPreference motion, ThemePreference theme,
                        boolean coordinates, boolean legalMoveHints, boolean premoves, boolean confirmMoves,
                        boolean gameSounds, boolean inAppNotifications, boolean notificationSounds) {
         boardPalette = palette;
         boardOrientation = orientation;
         motionPreference = motion;
+        themePreference = theme;
         showCoordinates = coordinates;
         showLegalMoveHints = legalMoveHints;
         premovesEnabled = premoves;

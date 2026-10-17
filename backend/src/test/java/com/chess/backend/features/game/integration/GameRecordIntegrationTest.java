@@ -5,6 +5,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,6 +22,7 @@ import com.chess.backend.features.game.repository.GameHistoryRepository;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.repository.UserRepository;
 import com.chess.backend.features.user.service.ProfileService;
+import com.chess.backend.features.user.service.UserDirectory;
 import com.chess.backend.features.user.storage.FileStorage;
 import com.chess.backend.features.user.storage.StoredFile;
 import com.chess.backend.features.auth.security.JwtService;
@@ -99,6 +101,9 @@ class GameRecordIntegrationTest {
 
     @Autowired
     private ProfileService profileService;
+
+    @Autowired
+    private UserDirectory userDirectory;
 
     @Autowired
     private ChallengeService challengeService;
@@ -407,6 +412,31 @@ class GameRecordIntegrationTest {
         User user = new User(username, username + "@example.test", null, username);
         user.setEmailVerified(true);
         return users.save(user);
+    }
+
+    @Test
+    void userCanReadAndUpdateCrossDeviceSettings() throws Exception {
+        User user = userDirectory.create(new User("settings-player", "settings-player@example.test", null, "Settings Player"));
+        String token = jwtService.createAccessToken(user.getId(), user.getUsername(), UserRole.ROLE_USER);
+
+        mockMvc.perform(get("/api/users/me/settings").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.boardPalette").value("FOREST"))
+                .andExpect(jsonPath("$.data.themePreference").value("DARK"))
+                .andExpect(jsonPath("$.data.showCoordinates").value(true));
+
+        mockMvc.perform(put("/api/users/me/settings").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"boardPalette":"WALNUT","boardOrientation":"BLACK","motionPreference":"REDUCED",
+                                "themePreference":"LIGHT","showCoordinates":false,"showLegalMoveHints":false,
+                                "premovesEnabled":false,"moveConfirmation":true,"gameSoundsEnabled":true,
+                                "inAppNotificationsEnabled":false,"notificationSoundsEnabled":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.boardPalette").value("WALNUT"))
+                .andExpect(jsonPath("$.data.themePreference").value("LIGHT"))
+                .andExpect(jsonPath("$.data.notificationSoundsEnabled").value(true));
     }
 
     private String payload(GameChallenge challenge, String roomCode, String legacyRoomToken, boolean isDraw,
