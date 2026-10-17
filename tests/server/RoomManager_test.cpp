@@ -103,6 +103,30 @@ TEST(RoomManagerTest, CreateRoomAndJoinFlow) {
     EXPECT_EQ(room->getState(), net::RoomState::InProgress);
 }
 
+TEST(RoomManagerTest, ExplicitRoomCodeCollisionPreservesExistingRoom) {
+    net::RoomManager manager;
+    auto originalHost = std::make_shared<MockSession>("original-host");
+    auto duplicateHost = std::make_shared<MockSession>("duplicate-host");
+
+    auto original = manager.createRoomWithIdentity(
+        "DUP123", originalHost, net::RoomManager::TimeControl::unlimited(),
+        chess::Color::White, "user-original", "Original"
+    );
+    ASSERT_NE(original, nullptr);
+
+    auto duplicate = manager.createRoomWithIdentity(
+        "DUP123", duplicateHost, net::RoomManager::TimeControl::unlimited(),
+        chess::Color::Black, "user-duplicate", "Duplicate"
+    );
+
+    EXPECT_EQ(duplicate, nullptr);
+    EXPECT_EQ(manager.activeRoomCount(), 1u);
+    EXPECT_EQ(manager.getRoom("DUP123"), original);
+    EXPECT_EQ(manager.getRoomBySession("original-host"), original);
+    EXPECT_EQ(manager.getRoomBySession("duplicate-host"), nullptr);
+    EXPECT_EQ(duplicateHost->lastJson()["event"], "error");
+}
+
 /**
  * @brief Tests untimed move execution, turn alternation, and illegal turn detection.
  */
