@@ -50,13 +50,17 @@ export function AppShell() {
     queryFn: getMyProfile,
     enabled: Boolean(user),
   });
+  const displayName = profile.data?.displayName ?? user?.displayName;
 
   useEffect(() => {
     if (!resizing) return;
     const handlePointerMove = (event: PointerEvent) => {
       const width = Math.min(
         400,
-        Math.max(180, resizeStart.current.width + event.clientX - resizeStart.current.x),
+        Math.max(
+          180,
+          resizeStart.current.width + event.clientX - resizeStart.current.x,
+        ),
       );
       setNavWidth(width);
       localStorage.setItem("rook.navWidth", String(width));
@@ -73,7 +77,9 @@ export function AppShell() {
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     resizeStart.current = {
       x: event.clientX,
-      width: document.querySelector(".side-nav")?.getBoundingClientRect().width ?? navWidth,
+      width:
+        document.querySelector(".side-nav")?.getBoundingClientRect().width ??
+        navWidth,
     };
     event.preventDefault();
     setResizing(true);
@@ -82,7 +88,11 @@ export function AppShell() {
   return (
     <MantineShell
       header={{ height: 64 }}
-      navbar={{ width: navWidth, breakpoint: "sm", collapsed: { mobile: !opened } }}
+      navbar={{
+        width: navWidth,
+        breakpoint: "sm",
+        collapsed: { mobile: !opened },
+      }}
       padding="md"
     >
       <MantineShell.Header className="app-header">
@@ -103,10 +113,10 @@ export function AppShell() {
           <Group gap="md">
             <Group gap="xs" visibleFrom="sm">
               <Text size="sm" c="dimmed">
-                {user?.displayName}
+                {displayName}
               </Text>
               <Avatar src={profile.data?.avatarUrl} size="sm" radius="xl">
-                {user?.displayName?.slice(0, 1)}
+                {displayName?.slice(0, 1)}
               </Avatar>
             </Group>
             <UnstyledButton

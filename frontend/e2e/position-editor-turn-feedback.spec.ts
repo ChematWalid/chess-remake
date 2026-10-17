@@ -93,6 +93,85 @@ test("authenticated home stays at root and login redirects home", async ({
   await expect(page).toHaveURL(`${appUrl}/`);
 });
 
+test("top bar follows the saved profile name and photo", async ({ page }) => {
+  await installAuthenticatedSession(page);
+  let currentProfile = {
+    ...profile,
+    avatarUrl: "/avatars/turn-test.png",
+  };
+  await page.route("**/avatars/turn-test.png", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="#9fca91" /></svg>',
+    }),
+  );
+  await page.route("**/api/users/me", async (route) => {
+    if (route.request().method() === "PUT") {
+      currentProfile = {
+        ...currentProfile,
+        ...route.request().postDataJSON(),
+      };
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(currentProfile),
+    });
+  });
+
+  await page.goto(`${appUrl}/profile`);
+  await expect(
+    page.getByRole("heading", { name: "Your profile" }),
+  ).toBeVisible();
+  const topBar = page.locator(".app-header");
+  await expect(topBar.getByText("Turn Test")).toBeVisible();
+  await expect(topBar.locator("img")).toHaveAttribute(
+    "src",
+    "/avatars/turn-test.png",
+  );
+
+  await page.getByLabel("Display name").fill("Updated Name");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(topBar.getByText("Updated Name")).toBeVisible();
+  await expect(topBar.locator("img")).toHaveAttribute(
+    "src",
+    "/avatars/turn-test.png",
+  );
+});
+
+test("sidebar resizing persists after reload", async ({ page }) => {
+  await installAuthenticatedSession(page);
+  await page.goto(`${appUrl}/play`);
+  const sidebar = page.locator(".side-nav");
+  const separator = page.getByRole("separator", { name: "Resize sidebar" });
+  await expect(separator).toBeVisible();
+  const originalWidth = await sidebar.evaluate(
+    (element) => element.getBoundingClientRect().width,
+  );
+  const handle = await separator.boundingBox();
+  expect(handle).not.toBeNull();
+  await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(handle!.x + handle!.width / 2 + 56, handle!.y + 80, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      sidebar.evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(originalWidth + 40);
+
+  await page.reload();
+  await expect(separator).toBeVisible();
+  await expect
+    .poll(() =>
+      sidebar.evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(originalWidth + 40);
+});
+
 test("position editor undo and redo cover mode changes, board edits, FEN, and reset", async ({
   page,
 }) => {
@@ -149,6 +228,122 @@ test("position editor undo and redo cover mode changes, board edits, FEN, and re
   await expect(page.getByText("Setup moves: none")).toBeVisible();
   await page.getByRole("button", { name: "Redo" }).click();
   await expect(page.getByText("Setup moves: e4")).toBeVisible();
+});
+
+test("game review responds to keyboard navigation and carries the shown position into a challenge", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  const game = new Chess();
+  const fens = [game.fen()];
+  const firstMove = game.move("e4");
+  fens.push(game.fen());
+  const secondMove = game.move("e5");
+  fens.push(game.fen());
+  const review = {
+    summary: {
+      id: 42,
+      whiteUsername: player.username,
+      blackUsername: "review_rival",
+      draw: false,
+      whitePublicUserId: player.publicId,
+      blackPublicUserId: "223e4567-e89b-42d3-a456-426614174000",
+      winnerPublicUserId: player.publicId,
+      terminationReason: "CHECKMATE",
+      totalMoves: 2,
+      playedAt: "2026-01-01T00:00:00Z",
+    },
+    pgn: "",
+    moves: [firstMove.san, secondMove.san],
+    fens,
+    initialTimeSeconds: null,
+    incrementSeconds: null,
+    durationSeconds: 10,
+  };
+
+  await page.route("**/api/games/42", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(review),
+    }),
+  );
+  await page.route("**/api/users/*/profile", (route) => {
+    const username = new URL(route.request().url()).pathname.split("/").at(-2);
+    const currentPlayer = username === player.username;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        ...profile,
+        username,
+        displayName: currentPlayer ? player.displayName : "Review Rival",
+        publicId: currentPlayer
+          ? player.publicId
+          : "223e4567-e89b-42d3-a456-426614174000",
+      }),
+    });
+  });
+  await page.route("**/api/users/me/settings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(preferences),
+    }),
+  );
+  await page.route("**/api/friends", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope([
+        {
+          publicUserId: "223e4567-e89b-42d3-a456-426614174000",
+          username: "review_rival",
+          displayName: "Review Rival",
+          avatarUrl: null,
+          presence: "ONLINE",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/api/challenges/incoming**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({ items: [], page: 0, size: 15, totalElements: 0 }),
+    }),
+  );
+  await page.route("**/api/challenges/outgoing**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({ items: [], page: 0, size: 15, totalElements: 0 }),
+    }),
+  );
+
+  await page.goto(`${appUrl}/games/42`);
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("2/2", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(page.getByText("2/2", { exact: true })).toBeVisible();
+  await page.keyboard.press("Home");
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Challenge from this position" })
+    .click();
+  await expect(page).toHaveURL(`${appUrl}/play`);
+  await expect(
+    page.getByRole("combobox", { name: "Starting position" }),
+  ).toHaveValue("Custom position");
+  await expect(page.getByText("Black to move")).toBeVisible();
 });
 
 test("turn settings save and reload with their stored values", async ({
