@@ -264,6 +264,48 @@ test("cached profile data shows immediately and refreshes in the background", as
   await expect(displayName).toHaveValue("Updated Cache Test");
 });
 
+test("pagehide flush persists successful cached queries", async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = ((handler, timeout, ...args) =>
+      nativeSetTimeout(
+        handler,
+        timeout === 250 ? 60_000 : timeout,
+        ...args,
+      )) as typeof window.setTimeout;
+  });
+  await installApi(page);
+
+  await page.goto(`${appUrl}/profile`);
+  await expect(
+    page.getByRole("heading", { name: "Your profile" }),
+  ).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+
+  const cached = await page.evaluate(
+    (key) =>
+      new Promise<
+        { state: { queries: Array<{ queryKey: unknown[] }> } } | undefined
+      >((resolve, reject) => {
+        const openRequest = indexedDB.open("rook-browser-cache", 1);
+        openRequest.onerror = () => reject(openRequest.error);
+        openRequest.onsuccess = () => {
+          const request = openRequest.result
+            .transaction("entries")
+            .objectStore("entries")
+            .get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        };
+      }),
+    `query-cache:${player.publicId}`,
+  );
+
+  expect(
+    cached?.state.queries.some((query) => query.queryKey[0] === "profile"),
+  ).toBe(true);
+});
+
 test("draft restoration does not overwrite edits made during an IndexedDB read", async ({
   page,
 }) => {
