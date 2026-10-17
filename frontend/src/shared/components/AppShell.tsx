@@ -22,6 +22,9 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { getMyProfile } from "../../features/user/api/userApi";
+import { getIncomingChallenges } from "../../features/challenge/api/challengeApi";
+import { getIncomingRequests } from "../../features/social/api/socialApi";
+import { CountBadge } from "./CountBadge";
 import "./AppShell.css";
 
 const links = [
@@ -50,6 +53,20 @@ export function AppShell() {
     queryFn: getMyProfile,
     enabled: Boolean(user),
   });
+  const incomingFriendRequests = useQuery({
+    queryKey: ["friend-requests", "incoming"],
+    queryFn: getIncomingRequests,
+    enabled: Boolean(user),
+  });
+  const incomingChallenges = useQuery({
+    queryKey: ["challenges", "incoming"],
+    queryFn: getIncomingChallenges,
+    enabled: Boolean(user),
+    refetchInterval: 15_000,
+  });
+  const pendingChallengeCount =
+    incomingChallenges.data?.items.filter((item) => item.status === "PENDING")
+      .length ?? 0;
   const displayName = profile.data?.displayName ?? user?.displayName;
 
   useEffect(() => {
@@ -139,6 +156,19 @@ export function AppShell() {
             to={to}
             label={label}
             leftSection={<Icon size={18} stroke={1.7} />}
+            rightSection={
+              to === "/friends" ? (
+                <CountBadge
+                  count={incomingFriendRequests.data?.length ?? 0}
+                  label="incoming friend requests"
+                />
+              ) : to === "/play" ? (
+                <CountBadge
+                  count={pendingChallengeCount}
+                  label="incoming challenges"
+                />
+              ) : undefined
+            }
             active={
               location.pathname === to ||
               (to === "/history" && location.pathname.startsWith("/games/"))

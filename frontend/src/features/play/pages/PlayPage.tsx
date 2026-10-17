@@ -31,6 +31,7 @@ import { ChallengePositionPicker } from "../components/ChallengePositionPicker";
 import { ChallengePositionPreview } from "../components/ChallengePositionPreview";
 import type { ChallengePosition } from "../../position/utils/positionUtils";
 import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
+import { CountBadge } from "../../../shared/components/CountBadge";
 
 const timeOptions = [
   { value: "unlimited", label: "Untimed" },
@@ -320,12 +321,19 @@ export function PlayPage() {
           )}
           <section className="panel">
             <Group justify="space-between" mb="md">
-              <Text fw={700} size="lg">
-                Incoming
-              </Text>
-              <Text size="sm" c="dimmed">
-                {incoming.data?.totalElements ?? 0}
-              </Text>
+              <Group gap="xs">
+                <Text fw={700} size="lg">
+                  Incoming
+                </Text>
+                <CountBadge
+                  count={
+                    incoming.data?.items.filter(
+                      (item) => item.status === "PENDING",
+                    ).length ?? 0
+                  }
+                  label="incoming challenges"
+                />
+              </Group>
             </Group>
             {incoming.isLoading ? (
               <LoadingState />
@@ -381,7 +389,15 @@ export function PlayPage() {
           </section>
           <section className="panel">
             <Text fw={700} size="lg" mb="md">
-              Sent
+              Sent{" "}
+              <CountBadge
+                count={
+                  outgoing.data?.items.filter(
+                    (item) => item.status === "PENDING",
+                  ).length ?? 0
+                }
+                label="sent challenges"
+              />
             </Text>
             {outgoing.isLoading ? (
               <LoadingState />

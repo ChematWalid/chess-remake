@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { notifications } from "@mantine/notifications";
 import { InviteLinkCard } from "../components/InviteLinkCard";
+import { CountBadge } from "../../../shared/components/CountBadge";
 import {
   EmptyState,
   ErrorState,
@@ -101,11 +102,39 @@ export function FriendsPage() {
       <Tabs value={tab} onChange={setTab} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="friends">Friends</Tabs.Tab>
-          <Tabs.Tab value="incoming">
-            Incoming {incoming.data?.length ? `(${incoming.data.length})` : ""}
+          <Tabs.Tab
+            value="incoming"
+            rightSection={
+              <CountBadge
+                count={incoming.data?.length ?? 0}
+                label="incoming friend requests"
+              />
+            }
+          >
+            Incoming
           </Tabs.Tab>
-          <Tabs.Tab value="outgoing">Sent</Tabs.Tab>
-          <Tabs.Tab value="blocked">Blocked</Tabs.Tab>
+          <Tabs.Tab
+            value="outgoing"
+            rightSection={
+              <CountBadge
+                count={outgoing.data?.length ?? 0}
+                label="sent friend requests"
+              />
+            }
+          >
+            Sent
+          </Tabs.Tab>
+          <Tabs.Tab
+            value="blocked"
+            rightSection={
+              <CountBadge
+                count={blocked.data?.length ?? 0}
+                label="blocked players"
+              />
+            }
+          >
+            Blocked
+          </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="friends" pt="lg">
           {friends.isLoading ? (
