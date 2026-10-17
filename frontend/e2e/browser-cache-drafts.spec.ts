@@ -85,6 +85,147 @@ test("position editor restores a saved draft after a reload", async ({
   await expect(page.getByText("Draft saved", { exact: false })).toBeVisible();
 });
 
+test("position editor restores an account draft without local browser data", async ({
+  page,
+}) => {
+  await installApi(page);
+  const savedDraft = {
+    featureKey: "position-setup",
+    payload: {
+      mode: "DIRECT",
+      fen: "8/8/8/8/8/8/8/4K3 w - - 0 1",
+      start: "CUSTOM",
+      fenInput: "8/8/8/8/8/8/8/4K3 w - - 0 1",
+      setupMoves: [],
+      setupFens: [],
+    },
+    updatedAt: new Date().toISOString(),
+  };
+  await page.route("**/api/users/me/drafts**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope([savedDraft]),
+    }),
+  );
+
+  await page.goto(`${appUrl}/position-setup`);
+
+  await expect(page.getByLabel("FEN import or export")).toHaveValue(
+    "8/8/8/8/8/8/8/4K3 w - - 0 1",
+  );
+  await expect(page.getByText("Draft saved to your account.")).toBeVisible();
+});
+
+test("offline position edits restore locally and sync after reconnecting", async ({
+  page,
+}) => {
+  await installApi(page);
+  await page.route("**/api/friends", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope([
+        {
+          publicUserId: "123e4567-e89b-42d3-a456-426614174001",
+          username: "opponent",
+          displayName: "Opponent",
+          avatarUrl: null,
+          presence: "OFFLINE",
+        },
+      ]),
+    }),
+  );
+  const emptyPage = { items: [], page: 0, size: 20, totalElements: 0 };
+  await page.route("**/api/challenges/incoming", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(emptyPage),
+    }),
+  );
+  await page.route("**/api/challenges/outgoing", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(emptyPage),
+    }),
+  );
+  let online = true;
+  let savedDraft: {
+    featureKey: string;
+    payload: { fen?: string };
+    updatedAt: string;
+  } | null = null;
+  await page.route("**/api/users/me/drafts**", async (route) => {
+    if (!online) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Offline" }),
+      });
+      return;
+    }
+    if (route.request().method() === "PUT") {
+      savedDraft = {
+        featureKey: "position-setup",
+        payload: route.request().postDataJSON().payload,
+        updatedAt: new Date().toISOString(),
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: envelope(savedDraft),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(savedDraft ? [savedDraft] : []),
+    });
+  });
+
+  await page.goto(`${appUrl}/play`);
+  await page.getByRole("combobox", { name: "Starting position" }).click();
+  await page.getByRole("option", { name: "Custom position" }).click();
+  await page.getByRole("button", { name: "Set up position" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Set up a position" }),
+  ).toBeVisible();
+  await page.context().setOffline(true);
+  online = false;
+  await page.getByRole("combobox", { name: "Start with" }).click();
+  await page.getByRole("option", { name: "Empty board" }).click();
+  await page.getByRole("button", { name: "Place white K" }).click();
+  await page.locator('[data-square="e1"]').click();
+
+  await expect(
+    page.getByText("Saved in this browser. Sync will retry when online."),
+  ).toBeVisible();
+  expect(savedDraft).toBeNull();
+
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page).toHaveURL(/\/play$/);
+  await page.getByRole("combobox", { name: "Starting position" }).click();
+  await page.getByRole("option", { name: "Custom position" }).click();
+  await page.getByRole("button", { name: "Set up position" }).click();
+
+  await expect(page.getByLabel("FEN import or export")).toHaveValue(
+    "8/8/8/8/8/8/8/4K3 w - - 0 1",
+  );
+  await expect(
+    page.getByText("Saved in this browser. Sync will retry when online."),
+  ).toBeVisible();
+
+  online = true;
+  await page.context().setOffline(false);
+  await expect
+    .poll(() => savedDraft?.payload.fen)
+    .toBe("8/8/8/8/8/8/8/4K3 w - - 0 1");
+  await expect(page.getByText("Draft saved to your account.")).toBeVisible();
+});
+
 test("profile data is shown from the browser cache after a reload", async ({
   page,
 }) => {
