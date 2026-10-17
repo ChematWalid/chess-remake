@@ -25,16 +25,18 @@ export function HistoryPage() {
   const history = useQuery({
     queryKey: ["my-history", playerId ?? user?.publicId, page],
     queryFn: () =>
-      playerId && playerId !== user?.publicId
-        ? getPlayerGames(playerId, page)
-        : getMyGames(page),
+      playerId ? getPlayerGames(playerId, page) : getMyGames(page),
   });
   return (
     <div>
       <header className="page-heading">
         <div>
-          <h1>Your games</h1>
-          <p>Revisit every completed match.</p>
+          <h1>{playerId ? "Player game history" : "Your games"}</h1>
+          <p>
+            {playerId
+              ? "Completed games for this player."
+              : "Revisit every completed match."}
+          </p>
         </div>
       </header>
       {history.isLoading ? (
@@ -101,7 +103,12 @@ export function HistoryPage() {
                 Math.ceil(history.data.totalElements / history.data.size),
               )}
               value={page + 1}
-              onChange={(next) => setParams({ page: String(next - 1) })}
+              onChange={(next) =>
+                setParams((current) => {
+                  current.set("page", String(next - 1));
+                  return current;
+                })
+              }
               color="green"
             />
           </Group>

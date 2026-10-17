@@ -99,5 +99,9 @@ public class ProfileService {
     private User requireUser(long id) { return users.findById(id).orElseThrow(() -> new UserNotFoundException("User not found")); }
     private Profile toProfile(User user) { return new Profile(user.getId(), user.getPublicId(), user.getUsername(), user.getDisplayName(), user.getBio(), avatarUrl(user),
             user.isSearchable(), user.getTotalGames(), user.getWins(), user.getLosses(), user.getDraws(), user.getId()); }
-    private String avatarUrl(User user) { return user.getAvatarKey() == null ? null : "/api/users/" + user.getPublicId() + "/avatar"; }
+    private String avatarUrl(User user) {
+        if (user.getAvatarKey() == null) return null;
+        String version = user.getAvatarKey().substring(user.getAvatarKey().lastIndexOf('/') + 1);
+        return "/api/users/" + user.getPublicId() + "/avatar?v=" + version;
+    }
 }

@@ -168,6 +168,7 @@ public class FriendService {
     public String createInvite(long ownerId) {
         User owner = requireUser(ownerId);
         invites.deleteByOwner_IdAndConsumedAtIsNull(ownerId);
+        invites.flush();
         byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         invites.save(new FriendInvite(owner, hash(token)));

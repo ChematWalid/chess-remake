@@ -1,34 +1,52 @@
-import { Avatar, Button, Group, Paper, Stack, Text } from "@mantine/core";
-import { IconUserPlus } from "@tabler/icons-react";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+} from "@mantine/core";
+import { IconChessKnight, IconUserPlus } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
 import { notifications } from "@mantine/notifications";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SearchResult } from "../../../shared/api/types";
 import { sendFriendRequest } from "../../social/api/socialApi";
 
-export function SearchableProfile({ profile }: { profile: SearchResult }) {
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  async function requestFriendship() {
-    setBusy(true);
-    try {
-      await sendFriendRequest(profile.username);
-      setSent(true);
+interface SearchableProfileProps {
+  profile: SearchResult;
+  isFriend: boolean;
+  isRequested: boolean;
+  relationshipLoading: boolean;
+}
+
+export function SearchableProfile({
+  profile,
+  isFriend,
+  isRequested,
+  relationshipLoading,
+}: SearchableProfileProps) {
+  const cache = useQueryClient();
+  const requestFriendship = useMutation({
+    mutationFn: () => sendFriendRequest(profile.username),
+    onSuccess: () => {
+      void cache.invalidateQueries({
+        queryKey: ["friend-requests", "outgoing"],
+      });
       notifications.show({
         title: "Request sent",
         message: `You can challenge ${profile.displayName} after they accept.`,
         color: "green",
       });
-    } catch (error) {
+    },
+    onError: (error: Error) =>
       notifications.show({
         title: "Could not send request",
-        message: error instanceof Error ? error.message : "Try again.",
+        message: error.message,
         color: "red",
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
+      }),
+  });
 
   return (
     <Paper className="search-profile" withBorder p="md" radius="md">
@@ -50,15 +68,35 @@ export function SearchableProfile({ profile }: { profile: SearchResult }) {
             @{profile.username}
           </Text>
         </Stack>
-        <Button
-          leftSection={<IconUserPlus size={16} />}
-          variant={sent ? "light" : "default"}
-          disabled={sent}
-          loading={busy}
-          onClick={() => void requestFriendship()}
-        >
-          {sent ? "Requested" : "Add"}
-        </Button>
+        {isFriend ? (
+          <Group gap="xs" wrap="nowrap">
+            <Badge color="green" variant="light">
+              Friends
+            </Badge>
+            <Button
+              component={Link}
+              to={`/play?opponent=${encodeURIComponent(profile.username)}`}
+              leftSection={<IconChessKnight size={16} />}
+              variant="light"
+            >
+              Challenge
+            </Button>
+          </Group>
+        ) : (
+          <Button
+            leftSection={!isRequested && <IconUserPlus size={16} />}
+            variant={isRequested ? "light" : "default"}
+            disabled={isRequested || relationshipLoading}
+            loading={requestFriendship.isPending || relationshipLoading}
+            onClick={() => requestFriendship.mutate()}
+          >
+            {isRequested
+              ? "Requested"
+              : relationshipLoading
+                ? "Checking"
+                : "Add friend"}
+          </Button>
+        )}
       </Group>
       <Text size="xs" c="dimmed" mt="md">
         {profile.totalGames} games · {profile.wins} wins

@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import { notifications } from "@mantine/notifications";
+import { AvatarEditor } from "../components/AvatarEditor";
 import { useAuth } from "../../../shared/auth/AuthProvider";
 import { ErrorState, LoadingState } from "../../../shared/components/PageState";
 import {
@@ -75,7 +76,23 @@ export function ProfilePage() {
   });
   const avatar = useMutation({
     mutationFn: uploadAvatar,
-    onSuccess: () => void cache.invalidateQueries({ queryKey }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: ["profile"] });
+      void cache.invalidateQueries({ queryKey: ["friends"] });
+      void cache.invalidateQueries({ queryKey: ["profile-search"] });
+      notifications.show({
+        title: "Profile photo updated",
+        message:
+          "Your new photo is now visible on your profile and to other players.",
+        color: "green",
+      });
+    },
+    onError: (error: Error) =>
+      notifications.show({
+        title: "Could not update photo",
+        message: error.message,
+        color: "red",
+      }),
   });
   const requestFriend = useMutation({
     mutationFn: () =>
@@ -139,9 +156,19 @@ export function ProfilePage() {
       <Stack gap="lg">
         <section className="panel">
           <Group align="center" wrap="nowrap">
-            <Avatar src={data.avatarUrl} size={76} radius="xl">
-              {data.displayName.slice(0, 1)}
-            </Avatar>
+            {isOwner && (
+              <AvatarEditor
+                avatarUrl={data.avatarUrl}
+                displayName={data.displayName}
+                isSaving={avatar.isPending}
+                onSave={(file) => avatar.mutate(file)}
+              />
+            )}
+            {!isOwner && (
+              <Avatar src={data.avatarUrl} size={76} radius="xl">
+                {data.displayName.slice(0, 1)}
+              </Avatar>
+            )}
             <div>
               <Text fw={700} size="xl">
                 {data.displayName}
@@ -230,21 +257,10 @@ export function ProfilePage() {
                   />
                   <span>Let other players find me in search</span>
                 </label>
-                <Group justify="space-between">
+                <Group justify="flex-end">
                   <Button type="submit" loading={update.isPending}>
                     Save profile
                   </Button>
-                  <label className="upload-button">
-                    Change avatar
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0];
-                        if (file) avatar.mutate(file);
-                      }}
-                    />
-                  </label>
                 </Group>
               </Stack>
             </form>

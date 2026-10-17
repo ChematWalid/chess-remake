@@ -27,6 +27,9 @@ import { playUiTone } from "../../shared/utils/playUiTone";
 
 interface RealtimeValue {
   connected: boolean;
+  connectionStatus:
+    "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
+  connectionError: string | null;
   publish: (destination: string, body: unknown) => void;
   subscribe: (
     destination: string,
@@ -50,6 +53,9 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   const client = useRef<Client | null>(null);
   const listeners = useRef(new Map<string, Set<(payload: unknown) => void>>());
   const [connected, setConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] =
+    useState<RealtimeValue["connectionStatus"]>("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const subscribe = useCallback(
     (destination: string, listener: (payload: unknown) => void) => {
       const entries = listeners.current.get(destination) ?? new Set();
@@ -69,9 +75,16 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setConnected(false);
+      setConnectionStatus("idle");
+      setConnectionError(null);
+      return;
+    }
     const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
     const socketUrl = new URL("/ws", base).toString();
+    setConnectionStatus("connecting");
+    setConnectionError(null);
     const stomp = new Client({
       webSocketFactory: () => new SockJS(socketUrl),
       connectHeaders: { Authorization: `Bearer ${getAccessToken() ?? ""}` },
@@ -80,6 +93,8 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       heartbeatOutgoing: 10_000,
       onConnect: () => {
         setConnected(true);
+        setConnectionStatus("connected");
+        setConnectionError(null);
         for (const destination of [
           "/user/queue/presence",
           "/user/queue/challenges",
@@ -122,10 +137,14 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
               if (destination.endsWith("/challenges")) {
                 const challenge = challengeEventSchema.parse(payload);
                 void cache.invalidateQueries({ queryKey: ["challenges"] });
-                if (challenge.eventType === "STATUS_CHANGED" && challenge.status === "EXPIRED") {
+                if (
+                  challenge.eventType === "STATUS_CHANGED" &&
+                  challenge.status === "EXPIRED"
+                ) {
                   notifications.show({
                     title: "Game room expired",
-                    message: "Both players did not connect in time. You can send a new challenge.",
+                    message:
+                      "Both players did not connect in time. You can send a new challenge.",
                     color: "yellow",
                   });
                 }
@@ -188,23 +207,50 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       },
       onDisconnect: () => {
         setConnected(false);
+        setConnectionStatus("reconnecting");
       },
       onWebSocketClose: () => {
         setConnected(false);
+        setConnectionStatus(stomp.active ? "reconnecting" : "disconnected");
+        setConnectionError(
+          "Realtime connection closed. The client will retry automatically.",
+        );
+      },
+      onWebSocketError: () => {
+        setConnected(false);
+        setConnectionStatus("reconnecting");
+        setConnectionError(
+          "Could not reach the realtime server. Retrying automatically.",
+        );
+      },
+      onStompError: (frame) => {
+        setConnected(false);
+        setConnectionStatus("reconnecting");
+        setConnectionError(
+          frame.headers.message ??
+            "The realtime server rejected the connection.",
+        );
       },
     });
     client.current = stomp;
     stomp.activate();
     return () => {
       setConnected(false);
+      setConnectionStatus("idle");
       client.current = null;
       void stomp.deactivate();
     };
   }, [isAuthenticated, cache]);
 
   const value = useMemo(
-    () => ({ connected, publish, subscribe }),
-    [connected, publish, subscribe],
+    () => ({
+      connected,
+      connectionStatus,
+      connectionError,
+      publish,
+      subscribe,
+    }),
+    [connected, connectionStatus, connectionError, publish, subscribe],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

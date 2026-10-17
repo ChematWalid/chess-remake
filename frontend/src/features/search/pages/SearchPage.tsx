@@ -9,10 +9,16 @@ import {
 } from "../../../shared/components/PageState";
 import { SearchableProfile } from "../components/SearchableProfile";
 import { searchProfiles } from "../../user/api/userApi";
+import { getFriends, getOutgoingRequests } from "../../social/api/socialApi";
 
 export function SearchPage() {
   const [value, setValue] = useState("");
   const [query, setQuery] = useState("");
+  const friends = useQuery({ queryKey: ["friends"], queryFn: getFriends });
+  const outgoing = useQuery({
+    queryKey: ["friend-requests", "outgoing"],
+    queryFn: getOutgoingRequests,
+  });
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(value.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -54,7 +60,26 @@ export function SearchPage() {
         ) : results.data?.items.length ? (
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
             {results.data.items.map((profile) => (
-              <SearchableProfile key={profile.publicId} profile={profile} />
+              <SearchableProfile
+                key={profile.publicId}
+                profile={profile}
+                isFriend={
+                  friends.data?.some(
+                    (friend) => friend.publicUserId === profile.publicId,
+                  ) ?? false
+                }
+                isRequested={
+                  outgoing.data?.some(
+                    (request) => request.username === profile.username,
+                  ) ?? false
+                }
+                relationshipLoading={
+                  friends.isLoading ||
+                  outgoing.isLoading ||
+                  friends.isError ||
+                  outgoing.isError
+                }
+              />
             ))}
           </SimpleGrid>
         ) : (

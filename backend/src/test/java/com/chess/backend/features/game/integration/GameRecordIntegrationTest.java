@@ -160,6 +160,16 @@ class GameRecordIntegrationTest {
     }
 
     @Test
+    void replacesExistingActiveFriendInvite() {
+        User owner = verifiedUser("invite-owner");
+
+        String firstToken = friendService.createInvite(owner.getId());
+        String secondToken = friendService.createInvite(owner.getId());
+
+        assertThat(secondToken).isNotBlank().isNotEqualTo(firstToken);
+    }
+
+    @Test
     void engineMustConfirmBothPlayersBeforeARecordCanBeSaved() throws Exception {
         GameChallenge challenge = acceptedChallenge("ROOM07");
         challenge.setStatus(ChallengeStatus.ACCEPTED);

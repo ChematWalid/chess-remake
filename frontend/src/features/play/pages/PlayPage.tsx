@@ -48,7 +48,8 @@ export function PlayPage() {
   const [customMinutes, setCustomMinutes] = useState(5);
   const [increment, setIncrement] = useState(0);
   const [side, setSide] = useState("RANDOM");
-  const { connected, publish } = useRealtime();
+  const { connected, connectionStatus, connectionError, publish } =
+    useRealtime();
   const cache = useQueryClient();
   const friends = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const incoming = useQuery({
@@ -101,7 +102,14 @@ export function PlayPage() {
       });
       return;
     }
-    if (!opponent) return;
+    if (!opponent) {
+      notifications.show({
+        title: "Choose a friend",
+        message: "Select a friend before sending a challenge.",
+        color: "yellow",
+      });
+      return;
+    }
     const request: ChallengeRequest = {
       toUsername: opponent,
       challengerSide: side as ChallengeRequest["challengerSide"],
@@ -137,9 +145,32 @@ export function PlayPage() {
           <h1>Play chess</h1>
           <p>Pick a friend and set the board.</p>
         </div>
-        <Text size="sm" c={connected ? "green" : "dimmed"}>
-          {connected ? "● Connected" : "○ Connecting"}
+        <Text
+          size="sm"
+          c={
+            connected
+              ? "green"
+              : connectionStatus === "reconnecting" ||
+                  connectionStatus === "disconnected"
+                ? "red"
+                : "dimmed"
+          }
+        >
+          {connected
+            ? "● Connected"
+            : connectionStatus === "reconnecting"
+              ? "● Reconnecting"
+              : connectionStatus === "disconnected"
+                ? "● Disconnected"
+                : connectionStatus === "idle"
+                  ? "● Offline"
+                  : "○ Connecting"}
         </Text>
+        {connectionError && (
+          <Text size="xs" c="red">
+            {connectionError}
+          </Text>
+        )}
       </header>
       <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="lg">
         <section className="panel">
@@ -208,12 +239,8 @@ export function PlayPage() {
                 onChange={(value) => setSide(value ?? "RANDOM")}
                 allowDeselect={false}
               />
-              <Button
-                onClick={sendChallenge}
-                disabled={!opponent || !connected}
-                mt="sm"
-              >
-                Send challenge
+              <Button onClick={sendChallenge} mt="sm">
+                {connected ? "Send challenge" : "Reconnect to send challenge"}
               </Button>
             </Stack>
           )}
