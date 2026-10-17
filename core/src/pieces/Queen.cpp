@@ -13,4 +13,4 @@ const std::vector<Direction>& Queen::directions() const {
     return dirs;
 }
 
-} // namespace chess
+} 

@@ -42,4 +42,4 @@ bool SlidingPiece::attacks(const Board& board, Square from, Square target) const
     return false;
 }
 
-} // namespace chess
+} 

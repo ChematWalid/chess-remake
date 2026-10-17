@@ -153,4 +153,4 @@ public:
     std::optional<Color> pendingDrawOffer() const;
 };
 
-} // namespace chess
+} 

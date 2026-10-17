@@ -12,4 +12,4 @@ const std::vector<Direction>& Rook::directions() const {
     return dirs;
 }
 
-} // namespace chess
+} 

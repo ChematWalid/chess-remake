@@ -123,4 +123,4 @@ private:
     std::chrono::seconds roomStartTimeout_;
 };
 
-} /* namespace net */
+}

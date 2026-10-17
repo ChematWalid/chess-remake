@@ -1,5 +1,8 @@
 let audioContext: AudioContext | null = null;
 
+/**
+ * Plays a best-effort UI tone without interrupting gameplay if audio is unavailable.
+ */
 export function playUiTone(frequency = 660): void {
   try {
     audioContext ??= new AudioContext();
@@ -21,7 +24,5 @@ export function playUiTone(frequency = 660): void {
     gain.connect(audioContext.destination);
     oscillator.start();
     oscillator.stop(audioContext.currentTime + 0.13);
-  } catch {
-    // Audio is an optional enhancement; browser restrictions must not interrupt gameplay.
-  }
+  } catch {}
 }

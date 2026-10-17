@@ -31,7 +31,7 @@ void generateCastlingMoves(const Position& position, Color side, std::vector<Mov
         return;
     }
 
-    // King-side castling (O-O)
+    /** @brief King-side castling (O-O) */
     if (position.castling().has(side, Side::KingSide)) {
         if (board.isEmpty(Square(5, r)) && board.isEmpty(Square(6, r))) {
             const Piece* rook = board.pieceAt(Square(7, r));
@@ -44,7 +44,7 @@ void generateCastlingMoves(const Position& position, Color side, std::vector<Mov
         }
     }
 
-    // Queen-side castling (O-O-O)
+    /** @brief Queen-side castling (O-O-O) */
     if (position.castling().has(side, Side::QueenSide)) {
         if (board.isEmpty(Square(1, r)) && board.isEmpty(Square(2, r)) && board.isEmpty(Square(3, r))) {
             const Piece* rook = board.pieceAt(Square(0, r));
@@ -64,7 +64,7 @@ void generatePseudoLegalMoves(const Position& position, std::vector<Move>& pseud
     generateCastlingMoves(position, side, pseudoMoves);
 }
 
-} // namespace
+}
 
 std::vector<Move> MoveGenerator::legalMoves(const Position& position) {
     std::vector<Move> pseudoMoves;
@@ -109,4 +109,4 @@ std::optional<Move> MoveGenerator::resolve(const Position& position,
     return std::nullopt;
 }
 
-} // namespace chess
+} 

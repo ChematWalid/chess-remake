@@ -37,4 +37,4 @@ public:
     virtual std::optional<Move> parse(const Position& position, const std::string& text) const = 0;
 };
 
-} // namespace chess
+} 

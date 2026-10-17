@@ -47,4 +47,4 @@ public:
     bool attacks(const Board& board, Square from, Square target) const override;
 };
 
-} // namespace chess
+} 

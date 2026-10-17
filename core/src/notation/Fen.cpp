@@ -120,4 +120,4 @@ Position Fen::standard() {
     return parse(kStartingFen);
 }
 
-} // namespace chess
+} 

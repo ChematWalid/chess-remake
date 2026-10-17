@@ -38,4 +38,4 @@ std::optional<Move> UciNotation::parse(const Position& position, const std::stri
     return MoveGenerator::resolve(position, from, to, promo);
 }
 
-} // namespace chess
+} 

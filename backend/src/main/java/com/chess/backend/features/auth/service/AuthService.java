@@ -39,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+    private static final int MAX_SESSION_LABEL_LENGTH = 100;
+
     private final UserDirectory users;
     private final RefreshTokenRepository refreshTokens;
     private final EmailActionTokenRepository actionTokens;
@@ -160,7 +162,9 @@ public class AuthService {
 
     private AuthBundle issueSession(User user, String sessionLabel) {
         String rawToken = TokenUtils.randomToken(48);
-        refreshTokens.save(new RefreshToken(user, TokenUtils.sha256(rawToken), sessionLabel,
+        String boundedSessionLabel = sessionLabel == null ? "browser"
+                : sessionLabel.substring(0, Math.min(sessionLabel.length(), MAX_SESSION_LABEL_LENGTH));
+        refreshTokens.save(new RefreshToken(user, TokenUtils.sha256(rawToken), boundedSessionLabel,
                 clock.instant().plus(properties.refreshTokenTtl())));
         String accessToken = jwtService.createAccessToken(user.getId(), user.getUsername(), user.getRole());
         AuthResponse response = new AuthResponse(accessToken, "Bearer", properties.accessTokenTtl().toSeconds(), !user.isOnboardingComplete(),

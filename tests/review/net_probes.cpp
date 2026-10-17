@@ -30,7 +30,7 @@ void dump(const std::string& label, const MockSession& s) {
     }
 }
 
-} // namespace
+}
 
 int main() {
     std::cout << "== Probe A: host joins its own room ==\n";

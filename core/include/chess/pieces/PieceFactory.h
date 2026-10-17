@@ -37,4 +37,4 @@ public:
     static const Piece& fromSymbol(char symbol);
 };
 
-} // namespace chess
+} 

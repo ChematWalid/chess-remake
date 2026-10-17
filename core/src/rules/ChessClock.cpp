@@ -140,4 +140,4 @@ const ChessClock::TimeControl& ChessClock::timeControl() const {
     return control;
 }
 
-} // namespace chess
+} 

@@ -33,4 +33,4 @@ char Piece::symbol() const {
     return c;
 }
 
-} // namespace chess
+} 

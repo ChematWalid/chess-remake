@@ -267,4 +267,4 @@ WebhookClient::DeliveryResult WebhookClient::sendPayload(const std::string& json
     return DeliveryResult::Retry;
 }
 
-} /* namespace net */
+}

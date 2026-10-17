@@ -61,15 +61,15 @@ TEST(Fen, PartialCastlingAndDeepGame) {
 }
 
 TEST(Fen, ParseMalformedStrings) {
-    // Incomplete
+    /** @brief Incomplete */
     EXPECT_THROW(Fen::parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"), std::invalid_argument);
 
-    // Too many files in a rank
+    /** @brief Too many files in a rank */
     EXPECT_THROW(Fen::parse("rnbqkbnr9/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"), std::invalid_argument);
 
-    // Too few ranks
+    /** @brief Too few ranks */
     EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8 w - - 0 1"), std::invalid_argument);
 
-    // Invalid active color
+    /** @brief Invalid active color */
     EXPECT_THROW(Fen::parse("8/8/8/8/8/8/8/8 x - - 0 1"), std::invalid_argument);
 }

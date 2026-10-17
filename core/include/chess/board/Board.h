@@ -83,4 +83,4 @@ public:
     bool operator==(const Board& other) const;
 };
 
-} // namespace chess
+} 

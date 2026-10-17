@@ -51,4 +51,4 @@ public:
     static Position standard();
 };
 
-} // namespace chess
+} 

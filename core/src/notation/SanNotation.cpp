@@ -33,7 +33,7 @@ std::string normalizeSan(std::string s) {
     return s;
 }
 
-} // namespace
+}
 
 std::string SanNotation::serialize(const Position& position, const Move& move) const {
     const Board& board = position.board();
@@ -139,4 +139,4 @@ std::optional<Move> SanNotation::parse(const Position& position, const std::stri
     return std::nullopt;
 }
 
-} // namespace chess
+} 

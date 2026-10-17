@@ -22,7 +22,7 @@ void applyMoveToBoard(Board& board, const Move& move, Color side, const Piece* m
             if (movingPiece != nullptr) {
                 board.place(*movingPiece, move.to());
             }
-            // Move corresponding rook
+            /** @brief Move corresponding rook */
             if (move.to().file() == 6) {
                 Square rookFrom(7, move.from().rank());
                 Square rookTo(5, move.from().rank());
@@ -70,13 +70,13 @@ CastlingRights updateCastlingRights(CastlingRights rights,
         rights.removeAll(side);
     }
 
-    // Revoke rights if rooks move from corner origin squares
+    /** @brief Revoke rights if rooks move from corner origin squares */
     if (move.from() == Square(0, 0)) rights.remove(Color::White, Side::QueenSide);
     if (move.from() == Square(7, 0)) rights.remove(Color::White, Side::KingSide);
     if (move.from() == Square(0, 7)) rights.remove(Color::Black, Side::QueenSide);
     if (move.from() == Square(7, 7)) rights.remove(Color::Black, Side::KingSide);
 
-    // Revoke rights if rooks are captured on corner destination squares
+    /** @brief Revoke rights if rooks are captured on corner destination squares */
     if (move.to() == Square(0, 0)) rights.remove(Color::White, Side::QueenSide);
     if (move.to() == Square(7, 0)) rights.remove(Color::White, Side::KingSide);
     if (move.to() == Square(0, 7)) rights.remove(Color::Black, Side::QueenSide);
@@ -85,7 +85,7 @@ CastlingRights updateCastlingRights(CastlingRights rights,
     return rights;
 }
 
-} // namespace
+}
 
 Position::Position()
     : currentBoard(),
@@ -186,4 +186,4 @@ bool Position::operator==(const Position& other) const {
            fullmoves == other.fullmoves;
 }
 
-} // namespace chess
+} 

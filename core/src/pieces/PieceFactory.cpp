@@ -28,7 +28,7 @@ const Rook blackRook(Color::Black);
 const Queen blackQueen(Color::Black);
 const King blackKing(Color::Black);
 
-} // namespace
+}
 
 const Piece& PieceFactory::get(Color color, PieceType type) {
     if (color == Color::White) {
@@ -69,4 +69,4 @@ const Piece& PieceFactory::fromSymbol(char symbol) {
     }
 }
 
-} // namespace chess
+} 

@@ -7,7 +7,7 @@
 using namespace chess;
 
 TEST(GameRules, FoolsMateIsCheckmate) {
-    // Fool's mate position: Black Queen delivers checkmate on h4
+    /** @brief Fool's mate position: Black Queen delivers checkmate on h4 */
     std::string fen = "rnb1kbnr/pppp1ppp/4p3/8/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3";
     Position pos = Fen::parse(fen);
 
@@ -16,7 +16,7 @@ TEST(GameRules, FoolsMateIsCheckmate) {
 }
 
 TEST(GameRules, StalematePosition) {
-    // Black King on h8 has no legal moves, but is NOT in check
+    /** @brief Black King on h8 has no legal moves, but is NOT in check */
     std::string fen = "7k/5Q2/8/8/8/8/8/7K b - - 0 1";
     Position pos = Fen::parse(fen);
 
@@ -38,17 +38,17 @@ TEST(GameRules, InsufficientMaterialKingVsKing) {
 }
 
 TEST(GameRules, InsufficientMaterialKingAndMinorVsKing) {
-    // King + Knight vs King
+    /** @brief King + Knight vs King */
     std::string fenKnight = "8/8/8/4k3/8/8/5N2/4K3 w - - 0 1";
     EXPECT_TRUE(GameRules::hasInsufficientMaterial(Fen::parse(fenKnight).board()));
 
-    // King + Bishop vs King
+    /** @brief King + Bishop vs King */
     std::string fenBishop = "8/8/8/4k3/8/8/5B2/4K3 w - - 0 1";
     EXPECT_TRUE(GameRules::hasInsufficientMaterial(Fen::parse(fenBishop).board()));
 }
 
 TEST(GameRules, InsufficientMaterialSameColorBishops) {
-    // Both bishops on light squares: c1 (2,0=2) and e3 (4,2=6)
+    /** @brief Both bishops on light squares: c1 (2,0=2) and e3 (4,2=6) */
     std::string fen = "8/8/8/4k3/8/4b3/8/2B1K3 w - - 0 1";
     EXPECT_TRUE(GameRules::hasInsufficientMaterial(Fen::parse(fen).board()));
 }

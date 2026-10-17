@@ -145,4 +145,4 @@ std::string Protocol::opponentDisconnected() {
     return j.dump();
 }
 
-} /* namespace net */
+}

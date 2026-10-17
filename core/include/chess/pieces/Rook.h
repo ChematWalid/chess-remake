@@ -25,4 +25,4 @@ public:
     explicit Rook(Color color);
 };
 
-} // namespace chess
+} 

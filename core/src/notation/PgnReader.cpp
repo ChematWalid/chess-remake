@@ -94,7 +94,7 @@ void parseMovesFromMovetext(std::string_view movetext, PgnGame& game) {
     }
 }
 
-} // namespace
+}
 
 std::vector<PgnGame> PgnReader::parse(std::string_view pgnContent) {
     std::vector<PgnGame> games;
@@ -167,4 +167,4 @@ std::vector<PgnGame> PgnReader::loadFromFile(const std::filesystem::path& filepa
     return parse(buffer.str());
 }
 
-} // namespace chess
+} 

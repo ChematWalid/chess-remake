@@ -25,4 +25,4 @@ public:
     explicit King(Color color);
 };
 
-} // namespace chess
+} 

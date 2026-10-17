@@ -60,7 +60,7 @@ struct Case {
     std::vector<uint64_t> expected;
 };
 
-} // namespace
+}
 
 int main(int argc, char** argv) {
     int maxDepth = (argc > 1) ? std::stoi(argv[1]) : 4;

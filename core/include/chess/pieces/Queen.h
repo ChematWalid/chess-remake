@@ -25,4 +25,4 @@ public:
     explicit Queen(Color color);
 };
 
-} // namespace chess
+} 

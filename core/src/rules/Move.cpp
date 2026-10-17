@@ -42,4 +42,4 @@ bool Move::operator==(const Move& other) const {
            promotionPiece == other.promotionPiece;
 }
 
-} // namespace chess
+} 

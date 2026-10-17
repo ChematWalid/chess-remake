@@ -19,9 +19,12 @@ public:
      * @brief Configuration specifying the time constraints of a game.
      */
     struct TimeControl {
-        std::chrono::milliseconds initialTime; /**< Base time per player at start. */
-        std::chrono::milliseconds increment;   /**< Bonus added to player clock after each move. */
-        bool isUnlimited;                       /**< True if the game has no clock / time limit. */
+        /** @brief Base time per player at the start of the game. */
+        std::chrono::milliseconds initialTime;
+        /** @brief Bonus added to the active player's clock after a move. */
+        std::chrono::milliseconds increment;
+        /** @brief Whether the game has no clock or time limit. */
+        bool isUnlimited;
 
         /**
          * @brief Creates an untimed control (no clock / no time limit).
@@ -119,4 +122,4 @@ public:
     const TimeControl& timeControl() const;
 };
 
-} // namespace chess
+} 

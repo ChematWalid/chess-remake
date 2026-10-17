@@ -59,7 +59,7 @@ public:
     bool attacks(const Board& board, Square from, Square target) const override;
 };
 
-} // namespace chess
+} 
 
 #include "chess/pieces/King.h"
 #include "chess/pieces/Knight.h"

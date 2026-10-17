@@ -35,7 +35,7 @@ const char* reasonName(Reason r) {
     return "?";
 }
 
-} // namespace
+}
 
 int main() {
     std::cout << "== Probe 1: threefold repetition when first occurrence carries an en passant square ==\n";

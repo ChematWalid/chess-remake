@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# test.sh — build then run all tests with clean output
 set -e
 
 ./build.sh

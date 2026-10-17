@@ -17,7 +17,7 @@ std::string requiredEnvironment(const char* name) {
     return value;
 }
 
-void signalHandler(int /*signal*/) {
+void signalHandler(int) {
     g_shutdownRequested.store(true);
 }
 }

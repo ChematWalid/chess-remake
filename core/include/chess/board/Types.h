@@ -71,8 +71,10 @@ enum class MoveError {
  * across files (columns) and ranks (rows).
  */
 struct Direction {
-    int deltaFile; /**< The horizontal file offset (columns, positive = right). */
-    int deltaRank; /**< The vertical rank offset (rows, positive = up). */
+    /** @brief The horizontal file offset, with positive values pointing right. */
+    int deltaFile;
+    /** @brief The vertical rank offset, with positive values pointing up. */
+    int deltaRank;
 };
 
 /**
@@ -111,8 +113,10 @@ enum class Reason {
  * @details Combines the high-level result (win/loss/draw) with the exact rule trigger.
  */
 struct GameResult {
-    Outcome outcome; /**< The final game outcome. */
-    Reason reason;   /**< The specific condition that ended the game. */
+    /** @brief The final game outcome. */
+    Outcome outcome;
+    /** @brief The specific condition that ended the game. */
+    Reason reason;
 };
 
-} // namespace chess
+} 

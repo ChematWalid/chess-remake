@@ -60,7 +60,7 @@ bool isSamePlayer(const std::string& candidateId, const std::string& targetId) {
     return basePlayerId(candidateId) == basePlayerId(targetId);
 }
 
-} /* namespace */
+}
 
 GameRoom::GameRoom(
     std::string roomCode,
@@ -669,4 +669,4 @@ std::vector<std::string> GameRoom::getAllMovesSan() const {
     return sanMoves;
 }
 
-} /* namespace net */
+}

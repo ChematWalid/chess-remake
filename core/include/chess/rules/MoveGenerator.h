@@ -58,4 +58,4 @@ public:
                                        std::optional<PieceType> promo = std::nullopt);
 };
 
-} // namespace chess
+} 

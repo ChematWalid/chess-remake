@@ -5,7 +5,7 @@
 
 using namespace chess;
 
-// ── Constructor ───────────────────────────────────────────────────────────────
+/** @name Constructor */
 
 TEST(Square, ConstructorValidInput) {
     Square s(4, 3);
@@ -31,7 +31,7 @@ TEST(Square, ConstructorInvalidRank) {
     EXPECT_THROW(Square(0, 8),  std::out_of_range);
 }
 
-// ── toString ──────────────────────────────────────────────────────────────────
+/** @name toString */
 
 TEST(Square, ToStringCenter) {
     EXPECT_EQ(Square(4, 3).toString(), "e4");
@@ -45,7 +45,7 @@ TEST(Square, ToStringH8) {
     EXPECT_EQ(Square(7, 7).toString(), "h8");
 }
 
-// ── fromString ────────────────────────────────────────────────────────────────
+/** @name fromString */
 
 TEST(Square, FromStringValid) {
     Square s = Square::fromString("e4");
@@ -77,7 +77,7 @@ TEST(Square, FromStringInvalidLength) {
     EXPECT_THROW(Square::fromString(""),    std::invalid_argument);
 }
 
-// ── tryOffset ─────────────────────────────────────────────────────────────────
+/** @name tryOffset */
 
 TEST(Square, TryOffsetValid) {
     auto result = Square::tryOffset(Square(4, 3), 1, 1);
@@ -111,7 +111,7 @@ TEST(Square, TryOffsetZero) {
     EXPECT_EQ(result->toString(), "e4");
 }
 
-// ── operator== ────────────────────────────────────────────────────────────────
+/** @name operator== */
 
 TEST(Square, EqualityTrue) {
     EXPECT_EQ(Square(4, 3), Square(4, 3));
@@ -123,7 +123,7 @@ TEST(Square, EqualityFalse) {
 }
 
 TEST(Square, RoundTrip) {
-    // fromString → toString should give back the original string
+    /** @brief fromString → toString should give back the original string */
     EXPECT_EQ(Square::fromString("e4").toString(), "e4");
     EXPECT_EQ(Square::fromString("a1").toString(), "a1");
     EXPECT_EQ(Square::fromString("h8").toString(), "h8");

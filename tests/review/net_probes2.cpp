@@ -26,7 +26,7 @@ private:
     std::string id_;
 };
 
-} // namespace
+}
 
 int main() {
     std::cout << "== Probe F: clock after a vacated seat is re-filled mid-game (1 min, no increment) ==\n";

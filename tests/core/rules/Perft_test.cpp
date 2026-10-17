@@ -26,7 +26,7 @@ uint64_t perft(const Position& position, int depth) {
     return nodes;
 }
 
-} // namespace
+}
 
 TEST(Perft, StartingPositionDepth1) {
     Position pos = Fen::standard();
@@ -48,10 +48,10 @@ TEST(Perft, StartingPositionDepth4) {
     EXPECT_EQ(perft(pos, 4), 197281ULL);
 }
 
-// Kiwipete position - famous test position designed by Peter McKenzie to stress-test
-// all edge cases: pins, en passant, castling through check, promotions.
+/** @brief Kiwipete position - famous test position designed by Peter McKenzie to stress-test */
+/** @brief all edge cases: pins, en passant, castling through check, promotions. */
 TEST(Perft, KiwipetePositionDepth1) {
-    // "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+    /** @brief "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1" */
     std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
     Position pos = Fen::parse(fen);
     EXPECT_EQ(perft(pos, 1), 48ULL);

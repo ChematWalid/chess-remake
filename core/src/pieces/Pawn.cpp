@@ -57,4 +57,4 @@ bool Pawn::attacks(const Board& board, Square from, Square target) const {
     return (target.rank() == from.rank() + forward) && (std::abs(target.file() - from.file()) == 1);
 }
 
-} // namespace chess
+} 

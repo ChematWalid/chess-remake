@@ -25,4 +25,4 @@ public:
     explicit Bishop(Color color);
 };
 
-} // namespace chess
+} 

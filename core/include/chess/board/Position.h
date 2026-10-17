@@ -148,4 +148,4 @@ public:
     bool operator==(const Position& other) const;
 };
 
-} // namespace chess
+} 

@@ -38,4 +38,4 @@ public:
     std::optional<Move> parse(const Position& position, const std::string& text) const override;
 };
 
-} // namespace chess
+} 

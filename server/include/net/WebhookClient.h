@@ -120,4 +120,4 @@ private:
     [[nodiscard]] DeliveryResult sendPayload(const std::string& jsonString);
 };
 
-} /* namespace net */
+}

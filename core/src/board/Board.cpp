@@ -49,4 +49,4 @@ bool Board::operator==(const Board& other) const {
     return squares == other.squares;
 }
 
-} // namespace chess
+} 

@@ -188,4 +188,4 @@ void ChessGame::updateGameResult() {
     }
 }
 
-} // namespace chess
+} 

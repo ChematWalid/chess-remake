@@ -43,10 +43,14 @@ TEST(PieceAttacks, KnightAttacks) {
     const Piece& knight = PieceFactory::get(Color::White, PieceType::Knight);
     Square d4(3, 3);
 
-    EXPECT_TRUE(knight.attacks(b, d4, Square(4, 5))); // e6 (+1, +2)
-    EXPECT_TRUE(knight.attacks(b, d4, Square(5, 4))); // f5 (+2, +1)
-    EXPECT_FALSE(knight.attacks(b, d4, Square(3, 5))); // d6 (straight)
-    EXPECT_FALSE(knight.attacks(b, d4, Square(5, 5))); // f6 (diagonal)
+    /** @brief e6 (+1, +2) */
+    EXPECT_TRUE(knight.attacks(b, d4, Square(4, 5)));
+    /** @brief f5 (+2, +1) */
+    EXPECT_TRUE(knight.attacks(b, d4, Square(5, 4)));
+    /** @brief d6 (straight) */
+    EXPECT_FALSE(knight.attacks(b, d4, Square(3, 5)));
+    /** @brief f6 (diagonal) */
+    EXPECT_FALSE(knight.attacks(b, d4, Square(5, 5)));
 }
 
 TEST(PieceAttacks, RookAttacksAndBlockers) {
@@ -57,12 +61,13 @@ TEST(PieceAttacks, RookAttacksAndBlockers) {
 
     EXPECT_TRUE(rook.attacks(b, d4, d7));
 
-    // Place an obstacle at d5
+    /** @brief Place an obstacle at d5 */
     const Piece& obstacle = PieceFactory::get(Color::Black, PieceType::Pawn);
     b.place(obstacle, Square(3, 4));
 
     EXPECT_FALSE(rook.attacks(b, d4, d7));
-    EXPECT_TRUE(rook.attacks(b, d4, Square(3, 4))); // attacks the obstacle itself
+    /** @brief attacks the obstacle itself */
+    EXPECT_TRUE(rook.attacks(b, d4, Square(3, 4)));
 }
 
 TEST(PieceAttacks, BishopAttacksAndBlockers) {
@@ -73,7 +78,7 @@ TEST(PieceAttacks, BishopAttacksAndBlockers) {
 
     EXPECT_TRUE(bishop.attacks(b, c1, f4));
 
-    // Place an obstacle at d2
+    /** @brief Place an obstacle at d2 */
     const Piece& obstacle = PieceFactory::get(Color::White, PieceType::Pawn);
     b.place(obstacle, Square(3, 1));
 
@@ -85,13 +90,19 @@ TEST(PieceAttacks, PawnAttacks) {
     const Piece& whitePawn = PieceFactory::get(Color::White, PieceType::Pawn);
     Square e4(4, 3);
 
-    EXPECT_TRUE(whitePawn.attacks(b, e4, Square(3, 4)));  // d5
-    EXPECT_TRUE(whitePawn.attacks(b, e4, Square(5, 4)));  // f5
-    EXPECT_FALSE(whitePawn.attacks(b, e4, Square(4, 4))); // e5 (straight is not attack!)
-    EXPECT_FALSE(whitePawn.attacks(b, e4, Square(4, 2))); // e3 (backward)
+    /** @brief d5 */
+    EXPECT_TRUE(whitePawn.attacks(b, e4, Square(3, 4)));
+    /** @brief f5 */
+    EXPECT_TRUE(whitePawn.attacks(b, e4, Square(5, 4)));
+    /** @brief e5 (straight is not attack!) */
+    EXPECT_FALSE(whitePawn.attacks(b, e4, Square(4, 4)));
+    /** @brief e3 (backward) */
+    EXPECT_FALSE(whitePawn.attacks(b, e4, Square(4, 2)));
 
     const Piece& blackPawn = PieceFactory::get(Color::Black, PieceType::Pawn);
     Square e5(4, 4);
-    EXPECT_TRUE(blackPawn.attacks(b, e5, Square(3, 3)));  // d4
-    EXPECT_TRUE(blackPawn.attacks(b, e5, Square(5, 3)));  // f4
+    /** @brief d4 */
+    EXPECT_TRUE(blackPawn.attacks(b, e5, Square(3, 3)));
+    /** @brief f4 */
+    EXPECT_TRUE(blackPawn.attacks(b, e5, Square(5, 3)));
 }

@@ -13,4 +13,4 @@ const std::vector<Direction>& King::offsets() const {
     return offs;
 }
 
-} // namespace chess
+} 

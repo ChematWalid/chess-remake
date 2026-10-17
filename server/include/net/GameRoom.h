@@ -185,4 +185,4 @@ private:
     [[nodiscard]] std::vector<std::string> getAllMovesSan() const;
 };
 
-} /* namespace net */
+}

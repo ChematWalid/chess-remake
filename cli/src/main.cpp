@@ -39,7 +39,7 @@ int main() {
             break;
         }
 
-        // Trim leading and trailing whitespace
+        /** @brief Trim leading and trailing whitespace */
         input.erase(0, input.find_first_not_of(" \t\r\n"));
         input.erase(input.find_last_not_of(" \t\r\n") + 1);
 
@@ -83,7 +83,7 @@ int main() {
             continue;
         }
 
-        // 1. Resolve move: try SAN first, then UCI
+        /** @brief 1. Resolve move: try SAN first, then UCI */
         auto parsedMove = san.parse(game.position(), input);
         if (!parsedMove.has_value()) {
             parsedMove = uci.parse(game.position(), input);
@@ -94,7 +94,7 @@ int main() {
             continue;
         }
 
-        // 2. Authoritative backend execution & rule verification
+        /** @brief 2. Authoritative backend execution & rule verification */
         auto result = game.play(turn, parsedMove->from(), parsedMove->to(), parsedMove->promotion());
         if (!result.has_value()) {
             switch (result.error()) {
@@ -116,7 +116,7 @@ int main() {
         std::cout << ">> " << turnStr << " played: " << moveSan << "\n\n";
     }
 
-    // Final board display
+    /** @brief Final board display */
     std::cout << BoardRenderer::render(game.position().board()) << "\n";
     std::cout << "=========================================\n";
     std::cout << "                GAME OVER                \n";

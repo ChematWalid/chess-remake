@@ -82,4 +82,4 @@ public:
     bool operator==(const Square& other) const;
 };
 
-} // namespace chess
+} 

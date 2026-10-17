@@ -45,14 +45,15 @@ TEST(UciNotation, ParseIllegalOrInvalidMoves) {
     UciNotation uci;
     Position start = Fen::standard();
 
-    // Illegal piece movement
+    /** @brief Illegal piece movement */
     EXPECT_EQ(uci.parse(start, "e1e8"), std::nullopt);
 
-    // Bad syntax
+    /** @brief Bad syntax */
     EXPECT_EQ(uci.parse(start, "e2"), std::nullopt);
     EXPECT_EQ(uci.parse(start, "e2e4qq"), std::nullopt);
     EXPECT_EQ(uci.parse(start, "zzzz"), std::nullopt);
-    EXPECT_EQ(uci.parse(start, "e7e8k"), std::nullopt); // illegal promotion to King
+    /** @brief illegal promotion to King */
+    EXPECT_EQ(uci.parse(start, "e7e8k"), std::nullopt);
 }
 
 TEST(UciNotation, PolymorphicUsageThroughBasePointer) {

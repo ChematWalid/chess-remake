@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# build.sh — configure (first run) then compile
 set -e
 
 BUILD_DIR="build"

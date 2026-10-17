@@ -7,8 +7,10 @@
 using namespace chess;
 
 TEST(Move, NormalMoveGetters) {
-    Square from(4, 1); // e2
-    Square to(4, 3);   // e4
+    /** @brief e2 */
+    Square from(4, 1);
+    /** @brief e4 */
+    Square to(4, 3);
     Move m(from, to, MoveKind::DoublePawnPush);
 
     EXPECT_EQ(m.from(), from);
@@ -19,8 +21,10 @@ TEST(Move, NormalMoveGetters) {
 }
 
 TEST(Move, PromotionToQueen) {
-    Square from(4, 6); // e7
-    Square to(4, 7);   // e8
+    /** @brief e7 */
+    Square from(4, 6);
+    /** @brief e8 */
+    Square to(4, 7);
     Move m(from, to, MoveKind::Promotion, PieceType::Queen);
 
     EXPECT_EQ(m.from(), from);
@@ -32,8 +36,10 @@ TEST(Move, PromotionToQueen) {
 }
 
 TEST(Move, PromotionOtherPieces) {
-    Square from(0, 6); // a7
-    Square to(0, 7);   // a8
+    /** @brief a7 */
+    Square from(0, 6);
+    /** @brief a8 */
+    Square to(0, 7);
 
     Move r(from, to, MoveKind::Promotion, PieceType::Rook);
     EXPECT_EQ(r.toUci(), "a7a8r");

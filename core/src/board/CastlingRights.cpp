@@ -18,7 +18,7 @@ uint8_t bitFor(Color color, Side side) {
     return (side == Side::KingSide) ? BLACK_OO : BLACK_OOO;
 }
 
-} // namespace
+}
 
 CastlingRights::CastlingRights(uint8_t m) : mask(m) {}
 
@@ -80,4 +80,4 @@ bool CastlingRights::operator==(const CastlingRights& other) const {
     return mask == other.mask;
 }
 
-} // namespace chess
+} 

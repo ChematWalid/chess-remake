@@ -93,4 +93,4 @@ public:
     virtual bool attacks(const Board& board, Square from, Square target) const = 0;
 };
 
-} // namespace chess
+} 

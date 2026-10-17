@@ -92,7 +92,7 @@ std::string computeHmacSha256(const std::string& data, const std::string& secret
     return std::string(reinterpret_cast<char*>(md), mdLen);
 }
 
-} /* namespace */
+}
 
 std::optional<PlayerToken> JwtToken::verify(
     const std::string& token,
@@ -227,4 +227,4 @@ std::string JwtToken::create(
     return toSign + "." + sigB64;
 }
 
-} /* namespace net */
+}

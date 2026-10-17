@@ -26,4 +26,4 @@ public:
     explicit Knight(Color color);
 };
 
-} // namespace chess
+} 

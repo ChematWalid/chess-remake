@@ -60,4 +60,4 @@ bool Square::operator==(const Square& other) const {
     return idx == other.idx;
 }
 
-} // namespace chess
+} 

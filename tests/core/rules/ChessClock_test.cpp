@@ -41,7 +41,8 @@ TEST(ChessClock, InitialTimeAndConfiguration) {
 }
 
 TEST(ChessClock, ActivePlayerDeductionAndFischerIncrement) {
-    auto tc = ChessClock::TimeControl::standard(1, 2); // 1 min (60,000ms), 2s inc
+    /** @brief 1 min (60,000ms), 2s inc */
+    auto tc = ChessClock::TimeControl::standard(1, 2);
     ChessClock clock(tc);
 
     clock.start(Color::White);
@@ -51,12 +52,14 @@ TEST(ChessClock, ActivePlayerDeductionAndFischerIncrement) {
     auto blackMid = clock.timeRemaining(Color::Black);
 
     EXPECT_LT(whiteMid, std::chrono::milliseconds(60000));
-    EXPECT_EQ(blackMid, std::chrono::milliseconds(60000)); // Black time untouched
+    /** @brief Black time untouched */
+    EXPECT_EQ(blackMid, std::chrono::milliseconds(60000));
 
-    // White presses clock -> receives 2,000ms increment
+    /** @brief White presses clock -> receives 2,000ms increment */
     clock.press(Color::White);
     auto whiteAfterPress = clock.timeRemaining(Color::White);
-    EXPECT_GT(whiteAfterPress, whiteMid); // increment added
+    /** @brief increment added */
+    EXPECT_GT(whiteAfterPress, whiteMid);
 }
 
 TEST(ChessClock, PauseAndResume) {
@@ -72,7 +75,7 @@ TEST(ChessClock, PauseAndResume) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     auto pausedTime2 = clock.timeRemaining(Color::White);
 
-    // While paused, time should remain identical
+    /** @brief While paused, time should remain identical */
     EXPECT_EQ(pausedTime1, pausedTime2);
 
     clock.resume();
@@ -83,7 +86,7 @@ TEST(ChessClock, PauseAndResume) {
 }
 
 TEST(ChessClock, FlagExpirationDetection) {
-    // 25ms base time, 0 increment
+    /** @brief 25ms base time, 0 increment */
     ChessClock::TimeControl quick{
         .initialTime = std::chrono::milliseconds(25),
         .increment = std::chrono::milliseconds(0),

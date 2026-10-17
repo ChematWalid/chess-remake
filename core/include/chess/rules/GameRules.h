@@ -70,4 +70,4 @@ public:
     static bool isThreefoldRepetition(const std::vector<Position>& history);
 };
 
-} // namespace chess
+} 

@@ -106,4 +106,4 @@ public:
     bool operator==(const CastlingRights& other) const;
 };
 
-} // namespace chess
+} 

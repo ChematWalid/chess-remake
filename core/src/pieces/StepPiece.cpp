@@ -31,4 +31,4 @@ bool StepPiece::attacks(const Board& board, Square from, Square target) const {
     return false;
 }
 
-} // namespace chess
+} 

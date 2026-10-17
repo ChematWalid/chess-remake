@@ -102,4 +102,4 @@ public:
     [[nodiscard]] static std::string opponentDisconnected();
 };
 
-} /* namespace net */
+}

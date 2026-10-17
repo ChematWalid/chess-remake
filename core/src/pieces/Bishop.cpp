@@ -12,4 +12,4 @@ const std::vector<Direction>& Bishop::directions() const {
     return dirs;
 }
 
-} // namespace chess
+} 
