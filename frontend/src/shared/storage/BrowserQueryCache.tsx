@@ -69,6 +69,10 @@ export function BrowserQueryCache({
               query.state.dataUpdatedAt > Date.now() - CACHE_MAX_AGE,
           );
           hydrate(queryClient, { ...cached.state, queries });
+          void queryClient.invalidateQueries({
+            predicate: (query) => shouldPersist(query.queryKey),
+            refetchType: "none",
+          });
         } else if (cached) {
           void deleteBrowserValue(storageKey(userId));
         }
