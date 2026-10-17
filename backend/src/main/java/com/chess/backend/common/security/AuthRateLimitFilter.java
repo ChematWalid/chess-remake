@@ -3,7 +3,9 @@ package com.chess.backend.common.security;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +21,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.http.MediaType;
@@ -57,12 +60,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         try {
             String ip = clientAddress(request);
             if (!allow("ip:" + ip, rule.ipLimit(), rule.window())) {
-                tooManyRequests(response);
+                tooManyRequests(response, rule.window());
                 return;
             }
             String identifier = identifier(wrapped, rule.identifierField());
             if (identifier != null && !allow("identifier:" + identifier, rule.identifierLimit(), rule.window())) {
-                tooManyRequests(response);
+                tooManyRequests(response, rule.window());
                 return;
             }
         } catch (DataAccessException exception) {
@@ -79,7 +82,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if (limit < 1) return true;
         String key = "chess:rate-limit:" + digest(identity);
         Long count = redis.execute(INCREMENT, List.of(key), window.toMillis());
-        return count != null && count <= limit;
+        if (count == null) {
+            throw new DataAccessResourceFailureException("Redis did not return a rate limit count");
+        }
+        return count <= limit;
     }
 
     private String identifier(CachedBodyRequest request, String field) {
@@ -112,9 +118,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private static void tooManyRequests(HttpServletResponse response) throws IOException {
+    private static void tooManyRequests(HttpServletResponse response, Duration window) throws IOException {
         response.setStatus(429);
-        response.setHeader("Retry-After", "900");
+        response.setHeader("Retry-After", Long.toString(window.toSeconds()));
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         new ObjectMapper().writeValue(response.getOutputStream(),
                 AppResponse.error(429, "AUTH_RATE_LIMITED", "Too many attempts. Try again later"));
@@ -127,6 +133,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             case "/api/auth/forgot-password" -> new Rule(15, 5, Duration.ofHours(1), "email");
             case "/api/auth/verify-email", "/api/auth/reset-password" ->
                     new Rule(15, 5, Duration.ofHours(1), "token");
+            case "/api/auth/oauth/exchange" -> new Rule(20, 8, Duration.ofMinutes(15), "code");
             default -> null;
         };
     }
@@ -140,12 +147,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             this.body = request.getInputStream().readAllBytes();
         }
         private byte[] body() { return body; }
-        @Override public jakarta.servlet.ServletInputStream getInputStream() {
+        @Override public ServletInputStream getInputStream() {
             ByteArrayInputStream input = new ByteArrayInputStream(body);
-            return new jakarta.servlet.ServletInputStream() {
+            return new ServletInputStream() {
                 @Override public boolean isFinished() { return input.available() == 0; }
                 @Override public boolean isReady() { return true; }
-                @Override public void setReadListener(jakarta.servlet.ReadListener listener) { }
+                @Override public void setReadListener(ReadListener listener) { }
                 @Override public int read() { return input.read(); }
             };
         }

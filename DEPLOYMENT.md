@@ -1,6 +1,6 @@
 # Self-host on your PC with ngrok
 
-This Compose deployment runs the React site, Spring Boot API and STOMP endpoint, C++ game server, PostgreSQL, and MinIO on your PC. ngrok provides the public HTTPS hostname and tunnel; Caddy routes that traffic to the app. You do not need a purchased domain, router port forwarding, or a public home IP. PostgreSQL and MinIO are private on the Compose network, and their data is kept in named volumes.
+This Compose deployment runs the React site, Spring Boot API and STOMP endpoint, C++ game server, PostgreSQL, MinIO, Redis, and RabbitMQ on your PC. ngrok provides the public HTTPS hostname and tunnel; Caddy routes that traffic to the app. You do not need a purchased domain, router port forwarding, or a public home IP. PostgreSQL, MinIO, Redis, and RabbitMQ are private on the Compose network, and their data is kept in named volumes.
 
 ## What you need
 
@@ -26,7 +26,7 @@ Edit `.env.deploy`:
 - Set `NGROK_AUTHTOKEN` to the token from your ngrok dashboard. Keep it private.
 - Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `APP_EMAIL_FROM` to your mail provider's values. For STARTTLS, the usual port is 587.
 - Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from Google Cloud. Add `https://YOUR_NGROK_DOMAIN/login/oauth2/code/google` as an authorized redirect URI.
-- Keep the generated database, JWT, webhook, and MinIO secrets. `APP_S3_ENDPOINT` should be `http://minio:9000`; MinIO uses the matching generated credentials, and the backend creates the configured bucket on startup.
+- Keep the generated database, JWT, webhook, MinIO, Redis, and RabbitMQ secrets. `APP_S3_ENDPOINT` should be `http://minio:9000`; MinIO uses the matching generated credentials, and the backend creates the configured bucket on startup.
 
 Keep `.env.deploy` private. It is ignored by Git. Do not paste its contents into chat or commit it. Validate that required settings are present:
 
@@ -75,7 +75,7 @@ Use a MinIO client attached to the Compose network to back up the `deploy-minio`
 
 ## Local development
 
-The existing backend and game-server local workflows remain available. The unified root development stack uses separate environment files and volumes:
+The unified root development stack uses separate environment files and volumes:
 
 ```sh
 cp .env.dev.example .env.dev
@@ -83,3 +83,5 @@ docker compose --env-file .env.dev -f compose.dev.yaml up --build
 ```
 
 It serves Vite on `http://localhost:5173`, Spring on `http://localhost:8080`, C++ WebSocket on `ws://localhost:9002`, MinIO on `http://localhost:9003` (console `http://localhost:9004`), and Mailpit at `http://localhost:8025`. Development data is separate from deployment data.
+
+The public deployment remains a single backend instance. Redis shares auth limits and presence between backend instances, while RabbitMQ relays STOMP messages and broadcasts user session registries. This makes backend instances compatible with shared state, but Redis and RabbitMQ themselves are single nodes in this Compose setup. Use managed or clustered Redis and RabbitMQ before requiring high availability across hosts. For a local two-instance browser smoke test, start Compose with `--profile multi-instance` and follow [the frontend browser test instructions](frontend/e2e/README.md).

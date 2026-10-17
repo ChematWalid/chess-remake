@@ -4,6 +4,8 @@ The REST API is described by OpenAPI at `/v3/api-docs` and the interactive Swagg
 
 ## REST conventions
 
+Public authentication POST requests use distributed Redis rate limits. Limits use the client IP, and selected operations also use a SHA-256 hash of the submitted account identifier or one-time token. Login allows 20 attempts per IP and 8 per identifier in 15 minutes; registration allows 5 requests per IP per hour; verification and password recovery allow 15 requests per IP and 5 per identifier per hour. OAuth code exchange allows 20 requests per IP and 8 per code in 15 minutes. A limit response is `429 AUTH_RATE_LIMITED` with `Retry-After`. If Redis is unavailable, these endpoints return `503 AUTH_RATE_LIMIT_UNAVAILABLE` rather than accepting unbounded attempts.
+
 - Send `Authorization: Bearer <accessToken>` on protected requests. Access tokens expire after the configured access-token lifetime.
 - JSON success responses use `{ "success": true, "code": 200, "message": "Success", "data": ... }`. Error responses use the same envelope with `success: false`, `errorCode`, and a safe message. Validation errors also include an `errors` object.
 - `POST /api/auth/login` and token refresh return an access token in the JSON data and set the refresh token in the `HttpOnly` `chess_refresh` cookie. Send cookies with credentials enabled. Refresh and logout use that cookie; logout revokes it and returns `204`.

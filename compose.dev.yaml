@@ -54,6 +54,63 @@ services:
       retries: 5
     restart: unless-stopped
 
+  backend-replica:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env.dev
+    profiles: ["multi-instance"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      APP_S3_ENDPOINT: http://minio:9000
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_AUTH: "false"
+      SMTP_STARTTLS: "false"
+      GOOGLE_CLIENT_ID: local-google-client-id
+      GOOGLE_CLIENT_SECRET: local-google-client-secret
+      REDIS_HOST: redis
+      APP_STOMP_RELAY_HOST: rabbitmq
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 20s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+    restart: unless-stopped
+
+  frontend-replica:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    env_file: .env.dev
+    profiles: ["multi-instance"]
+    environment:
+      VITE_API_PROXY_TARGET: http://backend-replica:8080
+    ports:
+      - "127.0.0.1:5174:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      backend-replica:
+        condition: service_healthy
+    restart: unless-stopped
+
   chess-server:
     build:
       context: .

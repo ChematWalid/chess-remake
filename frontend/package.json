@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "test:e2e": "playwright test",
     "preview": "vite preview --host 0.0.0.0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{json,ts,html,md}\""
   },
@@ -34,6 +35,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/sockjs-client": "^1.5.4",

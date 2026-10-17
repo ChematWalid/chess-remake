@@ -41,3 +41,5 @@ backend/uploads/
 .env.dev
 .env.deploy
 .env.*.local
+frontend/playwright-report/
+frontend/test-results/
