@@ -569,7 +569,9 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
   await page.goto(`${appUrl}/game/51`);
   await settingsLoaded;
   await expect(page.getByText("∞")).toHaveCount(2);
-  await expect(page.locator(".game-player-identity-turn")).toHaveCount(1);
+  await expect(
+    page.locator('.game-player-identity-turn[role="status"]'),
+  ).toHaveCount(1);
 
   const draggedPawn = await page.locator('[data-square="e2"]').boundingBox();
   expect(draggedPawn).not.toBeNull();
@@ -691,7 +693,9 @@ test("turn indicator follows the board when viewing as Black", async ({
   const blackToMove = new Chess(
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
   );
+  let gameSocket: WebSocketRoute | null = null;
   await page.routeWebSocket("ws://engine.test/black-game", (route) => {
+    gameSocket = route;
     route.onMessage((message) => {
       const event = JSON.parse(String(message)) as { action?: string };
       if (event.action !== "connect_token") return;
@@ -731,6 +735,22 @@ test("turn indicator follows the board when viewing as Black", async ({
   await expect(
     strips.last().locator(".game-player-identity--active"),
   ).toHaveCount(0);
+
+  const boardFrame = page.locator(".chessboard-frame");
+  const beforeTurnChange = await boardFrame.boundingBox();
+  expect(beforeTurnChange).not.toBeNull();
+  const opponentMove = blackToMove.move({ from: "e7", to: "e5" });
+  gameSocket?.send(
+    JSON.stringify(moveEvent(blackToMove, opponentMove.san, "e7e5")),
+  );
+  await expect(page.locator(".game-player-identity--active")).toHaveCount(1);
+  await expect(page.locator(".game-player-identity-turn--hidden")).toHaveCount(
+    1,
+  );
+  const afterTurnChange = await boardFrame.boundingBox();
+  expect(afterTurnChange).not.toBeNull();
+  expect(afterTurnChange?.height).toBe(beforeTurnChange?.height);
+  expect(afterTurnChange?.y).toBe(beforeTurnChange?.y);
 });
 
 test("queues a pawn recapture onto an occupied friendly square", async ({
