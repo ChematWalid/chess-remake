@@ -26,7 +26,7 @@ import {
   sendGameChallenge,
   type ChallengeRequest,
 } from "../../challenge/api/challengeApi";
-import { useRealtime } from "../../realtime/RealtimeProvider";
+import { useRealtime } from "../../realtime/RealtimeContext";
 
 const timeOptions = [
   { value: "unlimited", label: "Untimed" },

@@ -1,9 +1,7 @@
 import { Client, type IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -27,20 +25,7 @@ import { useAuth } from "../../shared/auth/AuthProvider";
 import { defaultSettings } from "../../shared/api/types";
 import { getSettings } from "../user/api/userApi";
 import { playUiTone } from "../../shared/utils/playUiTone";
-
-interface RealtimeValue {
-  connected: boolean;
-  connectionStatus:
-    "idle" | "connecting" | "connected" | "reconnecting" | "disconnected";
-  connectionError: string | null;
-  publish: (destination: string, body: unknown) => void;
-  subscribe: (
-    destination: string,
-    listener: (payload: unknown) => void,
-  ) => () => void;
-}
-
-const Context = createContext<RealtimeValue | null>(null);
+import { RealtimeContext, type RealtimeValue } from "./RealtimeContext";
 
 export function RealtimeProvider({ children }: PropsWithChildren) {
   const { isAuthenticated } = useAuth();
@@ -103,9 +88,8 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
           setConnectionError(
             "Your session expired. Sign in again to send challenges.",
           );
-          throw new Error(
-            "A valid access token is required for the realtime connection.",
-          );
+          void stomp.deactivate();
+          return;
         }
         stomp.connectHeaders = { Authorization: `Bearer ${token}` };
       },
@@ -276,12 +260,9 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     }),
     [connected, connectionStatus, connectionError, publish, subscribe],
   );
-  return <Context.Provider value={value}>{children}</Context.Provider>;
-}
-
-export function useRealtime(): RealtimeValue {
-  const value = useContext(Context);
-  if (!value)
-    throw new Error("useRealtime must be used within RealtimeProvider");
-  return value;
+  return (
+    <RealtimeContext.Provider value={value}>
+      {children}
+    </RealtimeContext.Provider>
+  );
 }

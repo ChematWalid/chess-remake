@@ -112,7 +112,10 @@ export function refreshSessionAccessToken(): Promise<string | null> {
   refreshPromise ??= refreshAccessToken().finally(() => {
     refreshPromise = null;
   });
-  return refreshPromise;
+  return refreshPromise.then((token) => {
+    if (!token && !accessToken) onSessionExpired?.();
+    return token;
+  });
 }
 
 export class ApiError extends Error {

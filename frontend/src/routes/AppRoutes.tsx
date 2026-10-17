@@ -2,10 +2,8 @@ import { Suspense, lazy, useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { AppShell } from "../shared/components/AppShell";
 import { useAuth } from "../shared/auth/AuthProvider";
-import {
-  RealtimeProvider,
-  useRealtime,
-} from "../features/realtime/RealtimeProvider";
+import { RealtimeProvider } from "../features/realtime/RealtimeProvider";
+import { useRealtime } from "../features/realtime/RealtimeContext";
 import { challengeEventSchema } from "../shared/api/types";
 
 function AssignedGameNavigator() {
