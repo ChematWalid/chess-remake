@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
     int port = 0;
     std::string host;
     std::string jwtSecret;
+    int disconnectGraceSeconds = 60;
     try {
         port = std::stoi(requiredEnvironment("CHESS_PORT"));
         host = requiredEnvironment("CHESS_HOST");
@@ -33,6 +34,13 @@ int main(int argc, char* argv[]) {
         requiredEnvironment("SPRING_WEBHOOK_URL");
         requiredEnvironment("INTERNAL_WEBHOOK_SECRET");
         requiredEnvironment("CHESS_OUTBOX_DIR");
+        if (const char* configuredGrace = std::getenv("CHESS_DISCONNECT_GRACE_SECONDS");
+            configuredGrace != nullptr && configuredGrace[0] != '\0') {
+            disconnectGraceSeconds = std::stoi(configuredGrace);
+        }
+        if (disconnectGraceSeconds < 0 || disconnectGraceSeconds > 3600) {
+            throw std::runtime_error("CHESS_DISCONNECT_GRACE_SECONDS must be between 0 and 3600");
+        }
         if (port < 1 || port > 65535) {
             throw std::runtime_error("CHESS_PORT must be between 1 and 65535");
         }
@@ -68,7 +76,8 @@ int main(int argc, char* argv[]) {
     std::cout << "--------------------------------------------------------\n" << std::endl;
 
     auto webhookClient = std::make_shared<net::WebhookClient>();
-    net::WebSocketServer server(port, host, webhookClient, jwtSecret);
+    net::WebSocketServer server(port, host, webhookClient, jwtSecret,
+                                std::chrono::seconds(disconnectGraceSeconds));
     if (!server.start()) {
         std::cerr << "Error: Could not bind or start WebSocket server on " << host << ":" << port << std::endl;
         return 1;

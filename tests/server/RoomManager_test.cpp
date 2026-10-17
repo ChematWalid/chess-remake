@@ -356,7 +356,8 @@ TEST(RoomManagerTest, PreventOrphanSeatsWhenSessionInActiveGame) {
     bob->clear();
     manager.onDisconnect("alice-orphan");
     EXPECT_FALSE(bob->messages().empty());
-    EXPECT_TRUE(room1->isDead());
+    EXPECT_FALSE(room1->isDead());
+    EXPECT_EQ(manager.activeRoomCount(), 1u);
 }
 
 /**

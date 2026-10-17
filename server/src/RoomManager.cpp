@@ -8,10 +8,12 @@ namespace net {
 
 RoomManager::RoomManager(
     std::shared_ptr<WebhookClient> webhookClient,
-    std::string jwtSecret
+    std::string jwtSecret,
+    std::chrono::seconds disconnectGracePeriod
 )
     : webhookClient_(std::move(webhookClient)),
-      jwtSecret_(std::move(jwtSecret)) {}
+      jwtSecret_(std::move(jwtSecret)),
+      disconnectGracePeriod_(disconnectGracePeriod) {}
 
 std::shared_ptr<GameRoom> RoomManager::createRoom(
     std::shared_ptr<IClientSession> hostSession,
@@ -53,6 +55,7 @@ std::shared_ptr<GameRoom> RoomManager::createRoom(
         "Player",
         webhookClient_
     );
+    room->setDisconnectGracePeriod(disconnectGracePeriod_);
     rooms_[code] = room;
     sessionToRoom_[hostSession->getId()] = code;
 
@@ -95,6 +98,7 @@ std::shared_ptr<GameRoom> RoomManager::createRoomWithIdentity(
         hostDisplayName,
         webhookClient_
     );
+    room->setDisconnectGracePeriod(disconnectGracePeriod_);
     rooms_[roomCode] = room;
     if (hostSession) {
         sessionToRoom_[hostSession->getId()] = roomCode;
@@ -257,7 +261,6 @@ void RoomManager::onDisconnect(const std::string& sessionId) {
 
     if (room) {
         room->handleDisconnect(sessionId);
-        room->markDead();
     }
 }
 

@@ -26,6 +26,8 @@ The REST API is described by OpenAPI at `/v3/api-docs` and the interactive Swagg
 | `POST /api/auth/oauth/onboarding` | Onboarding access token | `username`; completes first-login OAuth onboarding. |
 | `GET /api/users/me` | User | Current profile and stats. |
 | `PUT /api/users/me` | User | Optional `username`, `displayName`, `bio`, `searchable`. |
+| `GET /api/users/me/settings` | User | Read this account's cross-device board, motion, input, and notification preferences. |
+| `PUT /api/users/me/settings` | User | Replace preferences using typed enums for `boardPalette`, `boardOrientation`, and `motionPreference`, plus boolean controls. |
 | `POST /api/users/me/avatar` | User | Multipart field `file`; PNG, JPEG, or WEBP up to configured size. |
 | `GET /api/users/{publicId}/avatar` | Public | Avatar bytes; use returned `avatarUrl` values. |
 | `GET /api/users/{username}/profile` | User | Publicly visible profile and stats. |

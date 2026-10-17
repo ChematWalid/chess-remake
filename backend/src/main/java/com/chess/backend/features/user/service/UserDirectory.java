@@ -1,7 +1,9 @@
 package com.chess.backend.features.user.service;
 
 import com.chess.backend.features.user.domain.User;
+import com.chess.backend.features.user.domain.UserSettings;
 import com.chess.backend.features.user.repository.UserRepository;
+import com.chess.backend.features.user.repository.UserSettingsRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -10,14 +12,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserDirectory {
     private final UserRepository users;
+    private final UserSettingsRepository settings;
 
-    public UserDirectory(UserRepository users) {
+    public UserDirectory(UserRepository users, UserSettingsRepository settings) {
         this.users = users;
+        this.settings = settings;
     }
 
     @Transactional
     public User create(User user) {
-        return users.save(user);
+        User saved = users.save(user);
+        settings.save(new UserSettings(saved));
+        return saved;
     }
 
     @Transactional(readOnly = true)

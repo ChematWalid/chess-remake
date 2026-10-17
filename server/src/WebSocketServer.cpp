@@ -9,13 +9,14 @@ WebSocketServer::WebSocketServer(
     int port,
     std::string host,
     std::shared_ptr<WebhookClient> webhookClient,
-    std::string jwtSecret
+    std::string jwtSecret,
+    std::chrono::seconds disconnectGracePeriod
 )
     : port_(port),
       host_(std::move(host)),
       server_(port_, host_),
       webhookClient_(std::move(webhookClient)),
-      roomManager_(webhookClient_, std::move(jwtSecret)) {}
+      roomManager_(webhookClient_, std::move(jwtSecret), disconnectGracePeriod) {}
 
 WebSocketServer::~WebSocketServer() {
     stop();

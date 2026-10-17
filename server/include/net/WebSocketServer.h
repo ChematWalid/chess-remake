@@ -4,6 +4,7 @@
 #include "net/WebSocketSession.h"
 #include "net/WebhookClient.h"
 #include <atomic>
+#include <chrono>
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <memory>
 #include <mutex>
@@ -24,7 +25,8 @@ public:
         int port = 9002,
         std::string host = "0.0.0.0",
         std::shared_ptr<WebhookClient> webhookClient = nullptr,
-        std::string jwtSecret = ""
+        std::string jwtSecret = "",
+        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60)
     );
     ~WebSocketServer();
 

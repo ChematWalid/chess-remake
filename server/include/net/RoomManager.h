@@ -5,6 +5,7 @@
 #include "net/JwtToken.h"
 #include "net/WebhookClient.h"
 #include <memory>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -20,7 +21,8 @@ public:
 
     RoomManager(
         std::shared_ptr<WebhookClient> webhookClient = nullptr,
-        std::string jwtSecret = ""
+        std::string jwtSecret = "",
+        std::chrono::seconds disconnectGracePeriod = std::chrono::seconds(60)
     );
     ~RoomManager() = default;
 
@@ -116,6 +118,7 @@ private:
     std::unordered_map<std::string, std::string> sessionToRoom_;
     std::shared_ptr<WebhookClient> webhookClient_;
     std::string jwtSecret_;
+    std::chrono::seconds disconnectGracePeriod_;
 };
 
 } /* namespace net */
