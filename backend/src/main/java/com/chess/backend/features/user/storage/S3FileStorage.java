@@ -17,6 +17,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -53,7 +54,11 @@ public class S3FileStorage implements FileStorage {
                 return;
             } catch (S3Exception exception) {
                 if (exception.statusCode() == 404) {
-                    client.createBucket(CreateBucketRequest.builder().bucket(properties.s3Bucket()).build());
+                    try {
+                        client.createBucket(CreateBucketRequest.builder().bucket(properties.s3Bucket()).build());
+                    } catch (BucketAlreadyOwnedByYouException alreadyCreated) {
+                        return;
+                    }
                     return;
                 }
                 lastFailure = exception;

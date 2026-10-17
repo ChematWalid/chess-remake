@@ -1,0 +1,85 @@
+.app-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(
+      ellipse at 50% 42%,
+      rgba(159, 202, 145, 0.09),
+      transparent 40%
+    ),
+    #121411;
+}
+
+.app-loading-card {
+  display: grid;
+  grid-template-columns: 3rem auto;
+  align-items: center;
+  gap: 0 1rem;
+  min-width: min(19rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(25, 28, 24, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.app-loading-mark {
+  display: grid;
+  grid-row: span 2;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border: 1px solid rgba(159, 202, 145, 0.24);
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.app-loading-card strong {
+  color: var(--text);
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+}
+
+.app-loading-card p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.app-loading-spinner {
+  grid-column: 2;
+  width: 2.25rem;
+  height: 2px;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.app-loading-spinner::after {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  content: "";
+  animation: app-loading-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes app-loading-progress {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(270%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-spinner::after {
+    animation-duration: 3s;
+  }
+}
