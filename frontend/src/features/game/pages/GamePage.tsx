@@ -609,16 +609,19 @@ export function GamePage({ live = false }: { live?: boolean }) {
     displayName: blackProfile.data?.displayName ?? blackUsername ?? "Black",
     avatarUrl: blackProfile.data?.avatarUrl ?? null,
   };
-  const topPlayer = live
-    ? color === "white"
+  const prefs = preferences.data ?? defaultSettings;
+  const colors =
+    prefs.boardOrientation === "AUTO"
+      ? color
+      : (prefs.boardOrientation.toLowerCase() as "white" | "black");
+  const topPlayer =
+    colors === "white"
       ? { ...blackPlayer, side: "Black" as const }
-      : { ...whitePlayer, side: "White" as const }
-    : { ...blackPlayer, side: "Black" as const };
-  const bottomPlayer = live
-    ? color === "white"
+      : { ...whitePlayer, side: "White" as const };
+  const bottomPlayer =
+    colors === "white"
       ? { ...whitePlayer, side: "White" as const }
-      : { ...blackPlayer, side: "Black" as const }
-    : { ...whitePlayer, side: "White" as const };
+      : { ...blackPlayer, side: "Black" as const };
   const currentFen = replay
     ? (replay.fens[index] ?? replay.fens[0] ?? new Chess().fen())
     : fen === "start"
@@ -645,8 +648,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
       return "w";
     }
   }, [currentFen]);
-  const topPlayerTurn = color === "white" ? "b" : "w";
-  const bottomPlayerTurn = color === "white" ? "w" : "b";
+  const topPlayerTurn = colors === "white" ? "b" : "w";
+  const bottomPlayerTurn = colors === "white" ? "w" : "b";
   const checkedKingSquare = useMemo(() => {
     const game = new Chess(displayedFen);
     if (!game.isCheck()) return null;
@@ -663,11 +666,6 @@ export function GamePage({ live = false }: { live?: boolean }) {
         .find((square) => square !== null) ?? null
     );
   }, [displayedFen]);
-  const prefs = preferences.data ?? defaultSettings;
-  const colors =
-    prefs.boardOrientation === "AUTO"
-      ? color
-      : (prefs.boardOrientation.toLowerCase() as "white" | "black");
   const legalMoves =
     selected && prefs.showLegalMoveHints
       ? (() => {
@@ -974,7 +972,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
             />
             {clock && (
               <Text className="clock">
-                {formatClock(clock[color === "white" ? "black" : "white"])}
+                {formatClock(clock[colors === "white" ? "black" : "white"])}
               </Text>
             )}
           </div>
@@ -996,7 +994,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
                 showTurnIndicator={live && prefs.turnIndicatorEnabled}
               />
               {clock && (
-                <Text className="clock">{formatClock(clock[color])}</Text>
+                <Text className="clock">
+                  {formatClock(clock[colors === "white" ? "white" : "black"])}
+                </Text>
               )}
             </div>
           )}

@@ -51,11 +51,11 @@ public class UserSettings {
     @Column(name = "move_confirmation", nullable = false)
     private boolean moveConfirmation;
     @Column(name = "game_sounds_enabled", nullable = false)
-    private boolean gameSoundsEnabled;
+    private boolean gameSoundsEnabled = true;
     @Column(name = "turn_indicator_enabled", nullable = false)
     private boolean turnIndicatorEnabled = true;
     @Column(name = "turn_sound_enabled", nullable = false)
-    private boolean turnSoundEnabled;
+    private boolean turnSoundEnabled = true;
     @Column(name = "in_app_notifications_enabled", nullable = false)
     private boolean inAppNotificationsEnabled = true;
     @Column(name = "notification_sounds_enabled", nullable = false)

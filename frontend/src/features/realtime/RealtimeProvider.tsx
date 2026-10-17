@@ -24,7 +24,7 @@ import {
 import { useAuth } from "../../shared/auth/AuthProvider";
 import { defaultSettings } from "../../shared/api/types";
 import { getSettings } from "../user/api/userApi";
-import { playUiTone } from "../../shared/utils/playUiTone";
+import { playUiTone, unlockUiAudio } from "../../shared/utils/playUiTone";
 import { RealtimeContext, type RealtimeValue } from "./RealtimeContext";
 
 export function RealtimeProvider({ children }: PropsWithChildren) {
@@ -43,6 +43,20 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
   const [connectionStatus, setConnectionStatus] =
     useState<RealtimeValue["connectionStatus"]>("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      unlockUiAudio();
+      window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("keydown", unlockAudio, true);
+    };
+    window.addEventListener("pointerdown", unlockAudio, true);
+    window.addEventListener("keydown", unlockAudio, true);
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio, true);
+      window.removeEventListener("keydown", unlockAudio, true);
+    };
+  }, []);
   const subscribe = useCallback(
     (destination: string, listener: (payload: unknown) => void) => {
       const entries = listeners.current.get(destination) ?? new Set();

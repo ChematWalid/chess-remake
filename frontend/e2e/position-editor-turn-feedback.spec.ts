@@ -442,6 +442,10 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
       currentTime = 0;
       state = "running";
       destination = {};
+      resume() {
+        this.state = "running";
+        return Promise.resolve();
+      }
       createOscillator() {
         const oscillator = {
           type: "sine",
@@ -622,7 +626,7 @@ test("turn indicator follows the board when viewing as Black", async ({
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: envelope(preferences),
+      body: envelope({ ...preferences, boardOrientation: "WHITE" }),
     }),
   );
   await page.route("**/api/users/turn_rival/profile", (route) =>
@@ -695,17 +699,14 @@ test("turn indicator follows the board when viewing as Black", async ({
   const strips = page.locator(".opponent-strip");
   await expect(strips.first().locator(".game-player-identity")).toHaveAttribute(
     "aria-label",
-    "Rival, White",
+    "turn_test, Black, to move",
   );
   await expect(
     strips.first().locator(".game-player-identity--active"),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   await expect(
     strips.last().locator(".game-player-identity--active"),
-  ).toHaveCount(1);
-  await expect(strips.last().locator(".game-player-identity-turn")).toHaveText(
-    "To move",
-  );
+  ).toHaveCount(0);
 });
 
 test("queues a pawn recapture onto an occupied friendly square", async ({

@@ -166,7 +166,7 @@ export const userSettingsSchema = z.object({
   moveConfirmation: z.boolean(),
   gameSoundsEnabled: z.boolean(),
   turnIndicatorEnabled: z.boolean().default(true),
-  turnSoundEnabled: z.boolean().default(false),
+  turnSoundEnabled: z.boolean().default(true),
   inAppNotificationsEnabled: z.boolean(),
   notificationSoundsEnabled: z.boolean(),
 });
@@ -258,9 +258,9 @@ export const defaultSettings: UserSettings = {
   showLegalMoveHints: true,
   premovesEnabled: true,
   moveConfirmation: false,
-  gameSoundsEnabled: false,
+  gameSoundsEnabled: true,
   turnIndicatorEnabled: true,
-  turnSoundEnabled: false,
+  turnSoundEnabled: true,
   inAppNotificationsEnabled: true,
   notificationSoundsEnabled: false,
 };
