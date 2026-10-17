@@ -11,7 +11,7 @@ import {
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { z } from "zod";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { IconChessKnight } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
@@ -19,6 +19,12 @@ import { ApiError } from "../../../shared/api/client";
 import type { AuthResponse } from "../../../shared/api/types";
 import { useAuth } from "../../../shared/auth/AuthProvider";
 import { login, register } from "../api/authApi";
+import {
+  consumeReturnPath,
+  peekReturnPath,
+  safeReturnPath,
+  storeReturnPath,
+} from "../utils/returnPath";
 import "./AuthPage.css";
 
 type AuthMode = "login" | "register";
@@ -41,6 +47,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   const isLogin = mode === "login";
   const { isAuthenticated, signIn } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo =
+    safeReturnPath(searchParams.get("returnTo")) ?? peekReturnPath();
   const [submitting, setSubmitting] = useState(false);
   const form = useForm({
     initialValues: isLogin
@@ -49,7 +58,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     validate: zodResolver(isLogin ? loginSchema : registerSchema),
   });
 
-  if (isAuthenticated) return <Navigate to="/play" replace />;
+  if (isAuthenticated) return <Navigate to={returnTo ?? "/play"} replace />;
 
   async function submit(values: typeof form.values) {
     setSubmitting(true);
@@ -59,10 +68,14 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
           values as { identifier: string; password: string },
         );
         signIn(result);
-        navigate(result.onboardingRequired ? "/onboarding" : "/play", {
+        const storedReturnTo = consumeReturnPath();
+        const destination = returnTo ?? storedReturnTo ?? "/play";
+        if (result.onboardingRequired) storeReturnPath(destination);
+        navigate(result.onboardingRequired ? "/onboarding" : destination, {
           replace: true,
         });
       } else {
+        storeReturnPath(returnTo);
         await register(
           values as {
             username: string;
@@ -77,7 +90,11 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             "We sent a verification link to finish creating your account.",
           color: "green",
         });
-        navigate("/login");
+        navigate(
+          returnTo
+            ? `/login?returnTo=${encodeURIComponent(returnTo)}`
+            : "/login",
+        );
       }
     } catch (error) {
       notifications.show({
@@ -157,6 +174,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             <Button
               component="a"
               href={`${import.meta.env.VITE_API_BASE_URL ?? ""}/oauth2/authorization/google`}
+              onClick={() => storeReturnPath(returnTo)}
               variant="default"
               fullWidth
             >
@@ -166,7 +184,10 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         </form>
         <Text c="dimmed" size="sm" ta="center" mt="xl">
           {isLogin ? "New to rook?" : "Already have an account?"}{" "}
-          <Anchor component={Link} to={isLogin ? "/register" : "/login"}>
+          <Anchor
+            component={Link}
+            to={`${isLogin ? "/register" : "/login"}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}
+          >
             {isLogin ? "Create account" : "Sign in"}
           </Anchor>
         </Text>

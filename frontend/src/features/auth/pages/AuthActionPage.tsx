@@ -18,12 +18,18 @@ import {
   resetPassword,
   verifyEmail,
 } from "../api/authApi";
+import {
+  safeReturnPath,
+  storeReturnPath,
+  peekReturnPath,
+} from "../utils/returnPath";
 
 type ActionMode = "forgot" | "reset" | "verify";
 
 export function AuthActionPage({ mode }: { mode: ActionMode }) {
   const [search] = useSearchParams();
   const token = search.get("token") ?? "";
+  const returnTo = mode === "verify" ? safeReturnPath(peekReturnPath()) : null;
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const schema =
@@ -52,7 +58,10 @@ export function AuthActionPage({ mode }: { mode: ActionMode }) {
         await requestPasswordReset((values as { email: string }).email);
       else if (mode === "reset")
         await resetPassword(token, (values as { password: string }).password);
-      else await verifyEmail(token);
+      else {
+        storeReturnPath(returnTo);
+        await verifyEmail(token);
+      }
       setDone(true);
     } catch (error) {
       notifications.show({
@@ -86,7 +95,14 @@ export function AuthActionPage({ mode }: { mode: ActionMode }) {
         {message ? (
           <Stack mt="md">
             <Text c="dimmed">{message}</Text>
-            <Button component={Link} to="/login">
+            <Button
+              component={Link}
+              to={
+                returnTo
+                  ? `/login?returnTo=${encodeURIComponent(returnTo)}`
+                  : "/login"
+              }
+            >
               Continue to sign in
             </Button>
           </Stack>

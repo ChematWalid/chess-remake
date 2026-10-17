@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import { useAuth } from "../../../shared/auth/AuthProvider";
 import { completeOAuthOnboarding } from "../api/authApi";
+import { consumeReturnPath } from "../utils/returnPath";
 
 export function OnboardingPage() {
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,7 @@ export function OnboardingPage() {
     try {
       const auth = await completeOAuthOnboarding(username);
       signIn(auth);
-      navigate("/play", { replace: true });
+      navigate(consumeReturnPath() ?? "/play", { replace: true });
     } catch (error) {
       notifications.show({
         title: "Username unavailable",

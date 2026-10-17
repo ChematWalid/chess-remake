@@ -6,6 +6,7 @@ import { ApiError } from "../../../shared/api/client";
 import type { AuthResponse } from "../../../shared/api/types";
 import { useAuth } from "../../../shared/auth/AuthProvider";
 import { exchangeOAuthCode } from "../api/authApi";
+import { consumeReturnPath } from "../utils/returnPath";
 
 export function OAuthCallbackPage() {
   const [params] = useSearchParams();
@@ -23,11 +24,14 @@ export function OAuthCallbackPage() {
     exchangeOAuthCode(code)
       .then((result: AuthResponse) => {
         signIn(result);
-        navigate(result.onboardingRequired ? "/onboarding" : "/play", {
-          replace: true,
-        });
+        const returnTo = result.onboardingRequired ? null : consumeReturnPath();
+        navigate(
+          result.onboardingRequired ? "/onboarding" : (returnTo ?? "/play"),
+          { replace: true },
+        );
       })
       .catch((error: unknown) => {
+        consumeReturnPath();
         notifications.show({
           title: "Google sign in failed",
           message:
