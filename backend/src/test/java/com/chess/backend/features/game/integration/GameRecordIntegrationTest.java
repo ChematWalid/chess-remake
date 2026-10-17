@@ -19,6 +19,7 @@ import com.chess.backend.features.challenge.repository.GameChallengeRepository;
 import com.chess.backend.features.challenge.service.ChallengeService;
 import com.chess.backend.features.challenge.dto.SendChallengeRequest;
 import com.chess.backend.features.game.repository.GameHistoryRepository;
+import com.chess.backend.features.game.domain.enums.TerminationReason;
 import com.chess.backend.features.game.dto.GameStartRequest;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.repository.UserRepository;
@@ -232,6 +233,25 @@ class GameRecordIntegrationTest {
 
         assertThat(challenges.findById(challenge.getId()).orElseThrow().getStatus())
                 .isEqualTo(ChallengeStatus.EXPIRED);
+    }
+
+    @Test
+    void recordsStalemateAsADrawWithItsTerminationReason() throws Exception {
+        GameChallenge challenge = acceptedChallenge("STALE01");
+        String request = payload(challenge, "STALE01", "STALE01", true, null)
+                .replace("\"terminationReason\": \"CHECKMATE\"", "\"terminationReason\": \"Stalemate\"")
+                .replace("\"reason_code\": \"CHECKMATE\"", "\"reason_code\": \"STALEMATE\"");
+
+        mockMvc.perform(post("/api/internal/games/record").header("X-Internal-Token", INTERNAL_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isCreated());
+
+        var history = histories.findByRoomCode("STALE01").orElseThrow();
+        assertThat(history.isDraw()).isTrue();
+        assertThat(history.getWinner()).isNull();
+        assertThat(history.getTerminationReason()).isEqualTo(TerminationReason.STALEMATE);
+        assertThat(users.findById(challenge.getChallenger().getId()).orElseThrow().getDraws()).isEqualTo(1);
+        assertThat(users.findById(challenge.getChallenged().getId()).orElseThrow().getDraws()).isEqualTo(1);
     }
 
     @Test

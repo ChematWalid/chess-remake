@@ -623,6 +623,33 @@ TEST(RoomManagerTest, StartsFromCustomPositionAndKeepsSetupMovesInPgn) {
     EXPECT_NE(pgn.find("1. e4 e5"), std::string::npos);
 }
 
+TEST(RoomManagerTest, StalemateMoveFinishesGameAsDrawForBothPlayers) {
+    auto white = std::make_shared<MockSession>("w-stalemate");
+    auto black = std::make_shared<MockSession>("b-stalemate");
+    net::GameRoom room(
+            "STA001", white, chess::ChessClock::TimeControl::unlimited(), chess::Color::White,
+            "user_w", "WhitePlayer", nullptr, "7k/5Q2/8/6K1/8/8/8/8 w - - 0 1");
+    ASSERT_TRUE(room.joinWithIdentity(black, "user_b", "BlackPlayer", "black"));
+    white->clear();
+    black->clear();
+
+    room.handleMove("w-stalemate", "g5g6");
+
+    const auto whiteResult = white->lastJson();
+    const auto blackResult = black->lastJson();
+    EXPECT_EQ(whiteResult["event"], "game_over");
+    EXPECT_EQ(blackResult["event"], "game_over");
+    EXPECT_EQ(whiteResult["result"], "Draw");
+    EXPECT_EQ(blackResult["result"], "Draw");
+    EXPECT_TRUE(whiteResult["winner"].is_null());
+    EXPECT_TRUE(blackResult["winner"].is_null());
+    EXPECT_EQ(whiteResult["reason"], "Stalemate");
+    EXPECT_EQ(blackResult["reason"], "Stalemate");
+    EXPECT_EQ(whiteResult["reason_code"], "STALEMATE");
+    EXPECT_EQ(blackResult["reason_code"], "STALEMATE");
+    EXPECT_EQ(room.getState(), net::RoomState::Finished);
+}
+
 /**
  * Regression test for Item 16: Maximum incoming payload size cap.
  */
