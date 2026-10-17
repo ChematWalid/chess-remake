@@ -17,7 +17,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The compose stack starts PostgreSQL, MinIO, and Mailpit with the backend. PostgreSQL is available on host port `5434`, MinIO on `9003` (console `9004`), and Mailpit at `http://localhost:8025`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` to enable Google sign-in. Placeholder values keep the backend bootable but cannot complete OAuth. Email verification and password reset links are delivered to Mailpit.
+The compose stack starts PostgreSQL, MinIO, and Mailpit with the backend. PostgreSQL is available on host port `5434`, MinIO on `9003` (console `9004`), and Mailpit at `http://localhost:8025`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env` to enable Google sign-in. Placeholder values keep the backend bootable but cannot complete OAuth. Email verification and password reset links are delivered to Mailpit. The local Compose service explicitly overrides SMTP host, port, authentication, and TLS to keep test email inside Mailpit; Souklab’s SMTP settings are copied into the ignored `.env` for use outside this local test profile.
 
 For local development without Docker:
 

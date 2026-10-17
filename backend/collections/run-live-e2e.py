@@ -19,6 +19,7 @@ FRONTEND_ORIGIN = os.environ.get("CHESS_E2E_ORIGIN", "http://localhost:5173")
 PASSWORD = os.environ["CHESS_E2E_PASSWORD"]
 WHITE_USERNAME = os.environ["CHESS_E2E_WHITE_USERNAME"]
 BLACK_USERNAME = os.environ["CHESS_E2E_BLACK_USERNAME"]
+GAME_MODE = os.environ.get("CHESS_E2E_GAME_MODE", "checkmate")
 
 
 def post_json(path, payload, token=None):
@@ -113,6 +114,8 @@ async def wait_for_error(socket, error_code, timeout=10):
             event = await receive_event(socket, timeout)
             if event.get("errorCode") == error_code:
                 return event
+            if event.get("errorCode"):
+                raise RuntimeError(f"Expected STOMP error {error_code}, received {event['errorCode']}")
 
 
 async def run():
@@ -185,25 +188,49 @@ async def run():
 
             await wait_cpp(white_socket, "game_started")
             await wait_cpp(black_socket, "game_started")
-            await black_socket.send(json.dumps({"action": "move", "san": "e5"}))
-            out_of_turn = await wait_cpp_error(black_socket)
-            assert "turn" in out_of_turn.get("message", "").lower(), out_of_turn
-            await white_socket.send(json.dumps({"action": "move", "san": "e9"}))
-            illegal_move = await wait_cpp_error(white_socket)
-            assert "move" in illegal_move.get("message", "").lower(), illegal_move
-            print("C++ invalid and out-of-turn moves: error events returned; match remained playable")
-            for socket, san in ((white_socket, "f3"), (black_socket, "e5"), (white_socket, "g4"), (black_socket, "Qh4#")):
-                await socket.send(json.dumps({"action": "move", "san": san}))
-                await asyncio.gather(wait_cpp(white_socket, "move_made"), wait_cpp(black_socket, "move_made"))
+            if GAME_MODE == "checkmate":
+                await black_socket.send(json.dumps({"action": "move", "san": "e5"}))
+                out_of_turn = await wait_cpp_error(black_socket)
+                assert "turn" in out_of_turn.get("message", "").lower(), out_of_turn
+                await white_socket.send(json.dumps({"action": "move", "san": "e9"}))
+                illegal_move = await wait_cpp_error(white_socket)
+                assert "move" in illegal_move.get("message", "").lower(), illegal_move
+                print("C++ invalid and out-of-turn moves: error events returned; match remained playable")
+                for socket, san in ((white_socket, "f3"), (black_socket, "e5"), (white_socket, "g4"), (black_socket, "Qh4#")):
+                    await socket.send(json.dumps({"action": "move", "san": san}))
+                    await asyncio.gather(wait_cpp(white_socket, "move_made"), wait_cpp(black_socket, "move_made"))
+                expected_reason = "CHECKMATE"
+            elif GAME_MODE == "resignation":
+                await white_socket.send(json.dumps({"action": "resign"}))
+                expected_reason = "RESIGNATION"
+            elif GAME_MODE == "draw":
+                await white_socket.send(json.dumps({"action": "offer_draw"}))
+                await wait_cpp(black_socket, "draw_offered")
+                await black_socket.send(json.dumps({"action": "accept_draw"}))
+                expected_reason = "DRAW_AGREED"
+            else:
+                raise ValueError("CHESS_E2E_GAME_MODE must be checkmate, resignation, or draw")
             white_over, black_over = await asyncio.gather(
                 wait_cpp(white_socket, "game_over"), wait_cpp(black_socket, "game_over"),
             )
-            assert white_over.get("reason_code") == "CHECKMATE", white_over
-            assert len(white_over.get("moves", [])) == 4, white_over
-            print("C++ Fool's Mate: both players received 4 moves and CHECKMATE game-over")
+            assert white_over.get("reason_code") == expected_reason, white_over
+            if GAME_MODE == "checkmate":
+                assert len(white_over.get("moves", [])) == 4, white_over
+                print("C++ Fool's Mate: both players received 4 moves and CHECKMATE game-over")
+            else:
+                print(f"C++ {GAME_MODE}: both players received {expected_reason} game-over")
         finally:
             await white_socket.close()
             await black_socket.close()
+
+        for query, expected in (("", "Missing room and token"), ("?room=invalid&token=invalid", "Invalid or expired token")):
+            socket = await websockets.connect(ENGINE_URL + "/ws/play" + query, open_timeout=10)
+            try:
+                result = json.loads(await asyncio.wait_for(socket.recv(), timeout=5))
+                assert result.get("event") == "error" and expected in result.get("message", ""), result
+            finally:
+                await socket.close()
+        print("C++ missing and invalid room credentials: rejected with error events")
     finally:
         await white.close()
         await black.close()
