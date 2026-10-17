@@ -101,10 +101,10 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
         setConnectionStatus("connected");
         setConnectionError(null);
         for (const destination of [
-          "/user/queue/presence",
-          "/user/queue/challenges",
-          "/user/queue/notifications",
-          "/user/queue/errors",
+          "/user/topic/presence",
+          "/user/topic/challenges",
+          "/user/topic/notifications",
+          "/user/topic/errors",
         ]) {
           stomp.subscribe(destination, (message: IMessage) => {
             try {

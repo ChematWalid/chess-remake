@@ -39,14 +39,18 @@ public class FriendController {
 
     @GetMapping
     List<FriendView> friends(@AuthenticationPrincipal ChessPrincipal principal) {
-        return service.friends(principal.userId()).stream().map(friend -> new FriendView(friend.publicUserId(), friend.username(), friend.displayName(),
-                "/api/users/" + friend.publicUserId() + "/avatar", presence.status(friend.userId()))).toList();
+        var friends = service.friends(principal.userId());
+        var statuses = presence.statuses(friends.stream().map(friend -> friend.userId()).toList());
+        return friends.stream().map(friend -> new FriendView(friend.publicUserId(), friend.username(), friend.displayName(),
+                "/api/users/" + friend.publicUserId() + "/avatar", statuses.get(friend.userId()))).toList();
     }
 
     @GetMapping("/blocked")
     List<FriendView> blocked(@AuthenticationPrincipal ChessPrincipal principal) {
-        return service.blocked(principal.userId()).stream().map(user -> new FriendView(user.publicUserId(),
-                user.username(), user.displayName(), "/api/users/" + user.publicUserId() + "/avatar", presence.status(user.userId()))).toList();
+        var users = service.blocked(principal.userId());
+        var statuses = presence.statuses(users.stream().map(user -> user.userId()).toList());
+        return users.stream().map(user -> new FriendView(user.publicUserId(),
+                user.username(), user.displayName(), "/api/users/" + user.publicUserId() + "/avatar", statuses.get(user.userId()))).toList();
     }
 
     @GetMapping("/requests/incoming")

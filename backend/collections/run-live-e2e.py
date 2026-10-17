@@ -55,7 +55,7 @@ async def sockjs_connect(token):
     })
     await socket.send(json.dumps([connect]))
     await receive_frame(socket, "CONNECTED", 10)
-    for index, destination in enumerate(("/user/queue/challenges", "/user/queue/errors", "/user/queue/presence")):
+    for index, destination in enumerate(("/user/topic/challenges", "/user/topic/errors", "/user/topic/presence")):
         await socket.send(json.dumps([stomp_frame("SUBSCRIBE", {
             "id": str(index), "destination": destination, "ack": "auto",
         })]))

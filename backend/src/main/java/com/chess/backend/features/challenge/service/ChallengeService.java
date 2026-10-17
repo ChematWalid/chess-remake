@@ -175,8 +175,8 @@ public class ChallengeService {
             ChallengeEvent event = event(challenge, ChallengeEventType.STATUS_CHANGED, ChallengeStatus.EXPIRED,
                     null, null, null, null, null, null, null,
                     "Game room expired before both players connected");
-            messages.publish(challenge.getChallenger().getId(), "/queue/challenges", event);
-            messages.publish(challenge.getChallenged().getId(), "/queue/challenges", event);
+            messages.publish(challenge.getChallenger().getId(), "/topic/challenges", event);
+            messages.publish(challenge.getChallenged().getId(), "/topic/challenges", event);
         }
     }
 
@@ -224,13 +224,13 @@ public class ChallengeService {
     private void notifyStatus(GameChallenge challenge, UUID actorPublicId, ChallengeStatus status) {
         ChallengeEvent event = event(challenge, ChallengeEventType.STATUS_CHANGED, status, actorPublicId,
                 null, null, null, null, null, null, "Challenge has expired");
-        messages.publish(challenge.getChallenger().getId(), "/queue/challenges", event);
-        messages.publish(challenge.getChallenged().getId(), "/queue/challenges", event);
+        messages.publish(challenge.getChallenger().getId(), "/topic/challenges", event);
+        messages.publish(challenge.getChallenged().getId(), "/topic/challenges", event);
     }
 
     private void sendMatch(GameChallenge challenge, User recipient, GameSide color) {
         String url = properties.engineWsUrl();
-        messages.publish(recipient.getId(), "/queue/challenges",
+        messages.publish(recipient.getId(), "/topic/challenges",
                 event(challenge, ChallengeEventType.MATCH_ASSIGNED, ChallengeStatus.ACCEPTED,
                         challenge.getChallenger().getPublicId(), null, null, color, challenge.getRoomCode(), url, null, null));
     }
@@ -239,7 +239,7 @@ public class ChallengeService {
                                     UUID actorPublicId, String username, String displayName, String message) {
         ChallengeEvent event = event(challenge, type, challenge.getStatus(), actorPublicId, username, displayName,
                 null, null, null, null, message);
-        messages.publish(recipientId, "/queue/challenges", event);
+        messages.publish(recipientId, "/topic/challenges", event);
     }
 
     private ChallengeEvent event(GameChallenge challenge, ChallengeEventType type, ChallengeStatus status,

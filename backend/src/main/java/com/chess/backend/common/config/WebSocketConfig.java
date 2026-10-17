@@ -15,15 +15,26 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final AppProperties properties;
     private final JwtStompChannelInterceptor stompChannelInterceptor;
+    private final StompRelayProperties relayProperties;
 
-    public WebSocketConfig(AppProperties properties, JwtStompChannelInterceptor stompChannelInterceptor) {
+    public WebSocketConfig(AppProperties properties, JwtStompChannelInterceptor stompChannelInterceptor,
+                           StompRelayProperties relayProperties) {
         this.properties = properties;
         this.stompChannelInterceptor = stompChannelInterceptor;
+        this.relayProperties = relayProperties;
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue");
+        registry.enableStompBrokerRelay("/topic")
+                .setRelayHost(relayProperties.host())
+                .setRelayPort(relayProperties.port())
+                .setClientLogin(relayProperties.login())
+                .setClientPasscode(relayProperties.passcode())
+                .setSystemLogin(relayProperties.login())
+                .setSystemPasscode(relayProperties.passcode())
+                .setUserDestinationBroadcast("/topic/unresolved-user-destination")
+                .setUserRegistryBroadcast("/topic/simp-user-registry");
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }

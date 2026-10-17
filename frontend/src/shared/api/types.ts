@@ -66,7 +66,7 @@ export const searchResultSchema = z.object({
 });
 export type SearchResult = z.infer<typeof searchResultSchema>;
 
-export const presenceStatusSchema = z.enum(["ONLINE", "IN_GAME", "OFFLINE"]);
+export const presenceStatusSchema = z.enum(["ONLINE", "IN_GAME", "OFFLINE", "UNKNOWN"]);
 export type PresenceStatus = z.infer<typeof presenceStatusSchema>;
 export const presenceEventSchema = z.object({
   publicUserId: z.string().uuid(),

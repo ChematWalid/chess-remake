@@ -58,13 +58,13 @@ Google OAuth starts at `/oauth2/authorization/google`. The backend redirects to 
 ## STOMP, presence, and challenges
 
 - Connect to `/ws` using STOMP (SockJS fallback is enabled). Include `Authorization: Bearer <accessToken>` in the STOMP `CONNECT` frame.
-- Subscribe only to user destinations: `/user/queue/presence`, `/user/queue/challenges`, `/user/queue/notifications`, and `/user/queue/errors`.
+- Subscribe only to user destinations: `/user/topic/presence`, `/user/topic/challenges`, `/user/topic/notifications`, and `/user/topic/errors`.
 - Send commands under `/app`: `/app/challenge.send` with `toUsername`, optional `challengerSide` (`WHITE`, `BLACK`, `RANDOM`), and optional paired `initialTimeSeconds` / `incrementSeconds`; `/app/challenge.accept`, `/app/challenge.decline`, and `/app/challenge.cancel` each take `{ "challengeId": 123 }`.
 - Challenge events include an event type, challenge ID/status, opaque actor public ID, optional challenger identity and clock settings, then assigned room code, color, connect URL, player-specific engine JWT, or status message as applicable. The sender receives an `INVITATION_SENT` event with its challenge ID; the opponent receives `INVITATION_RECEIVED`.
 - On reconnect, use the incoming/outgoing challenge endpoints to reconcile state. `GET /api/challenges/{challengeId}` returns fresh caller-specific connection credentials only while the challenge is accepted.
-- Presence events use `{ "publicUserId": "uuid", "status": "ONLINE|IN_GAME|OFFLINE" }` and are sent to each accepted friend’s `/user/queue/presence` destination.
-- Challenge command failures are sent to `/user/queue/errors` as `{ "errorCode": "...", "message": "..." }`; the STOMP connection remains available.
-- Friend-request received/accepted/declined and game-saved notices are sent to `/user/queue/notifications`. Their subject user IDs are opaque UUIDs; a game-saved subject is the game-history ID.
+- Presence events use `{ "publicUserId": "uuid", "status": "ONLINE|IN_GAME|OFFLINE|UNKNOWN" }` and are sent to each accepted friend’s `/user/topic/presence` destination.
+- Challenge command failures are sent to `/user/topic/errors` as `{ "errorCode": "...", "message": "..." }`; the STOMP connection remains available.
+- Friend-request received/accepted/declined and game-saved notices are sent to `/user/topic/notifications`. Their subject user IDs are opaque UUIDs; a game-saved subject is the game-history ID.
 
 ## C++ live-game and webhook contract
 

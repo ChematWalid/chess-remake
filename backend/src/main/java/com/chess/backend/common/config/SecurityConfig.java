@@ -3,6 +3,7 @@ package com.chess.backend.common.config;
 import com.chess.backend.common.api.AppResponse;
 import com.chess.backend.features.auth.service.OAuthSuccessHandler;
 import com.chess.backend.common.security.RefreshCookieOriginFilter;
+import com.chess.backend.common.security.AuthRateLimitFilter;
 import com.chess.backend.common.domain.enums.UserRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.chess.backend.features.auth.security.JwtAuthenticationFilter;
@@ -29,7 +30,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter, OAuthSuccessHandler oAuthSuccessHandler,
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter,
+                                            AuthRateLimitFilter authRateLimitFilter, OAuthSuccessHandler oAuthSuccessHandler,
                                             ObjectMapper objectMapper, AppProperties properties) throws Exception {
         return http.csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -56,6 +58,7 @@ public class SecurityConfig {
                         }))
                 .oauth2Login(oauth -> oauth.successHandler(oAuthSuccessHandler).failureHandler(oAuthSuccessHandler))
                 .addFilterBefore(new RefreshCookieOriginFilter(properties, objectMapper), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
