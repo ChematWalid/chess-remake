@@ -2,6 +2,7 @@ package com.chess.backend.features.user.service;
 
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.domain.UserSettings;
+import com.chess.backend.features.game.domain.enums.GameResult;
 import com.chess.backend.features.user.repository.UserRepository;
 import com.chess.backend.features.user.repository.UserSettingsRepository;
 import java.util.Optional;
@@ -54,5 +55,15 @@ public class UserDirectory {
     @Transactional(readOnly = true)
     public boolean existsById(long userId) {
         return users.existsById(userId);
+    }
+
+    @Transactional
+    public void recordGameResult(long userId, GameResult result) {
+        int wins = result == GameResult.WIN ? 1 : 0;
+        int losses = result == GameResult.LOSS ? 1 : 0;
+        int draws = result == GameResult.DRAW ? 1 : 0;
+        if (users.recordGameResult(userId, wins, losses, draws) != 1) {
+            throw new IllegalStateException("Could not update player game statistics");
+        }
     }
 }

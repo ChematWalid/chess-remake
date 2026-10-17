@@ -178,7 +178,7 @@ public class FriendService {
     @Transactional
     public void redeemInvite(long visitorId, String token) {
         User visitor = requireUser(visitorId);
-        FriendInvite invite = invites.findActiveByHash(hash(token)).orElseThrow(() -> new FriendInviteInvalidException("Friend link is invalid or has already been used"));
+        FriendInvite invite = invites.lockActiveByHash(hash(token)).orElseThrow(() -> new FriendInviteInvalidException("Friend link is invalid or has already been used"));
         User owner = invite.getOwner();
         ensureDifferent(visitorId, owner.getId());
         Friendship relation = friendships.lockPair(visitorId, owner.getId()).orElse(null);
@@ -193,13 +193,15 @@ public class FriendService {
         return friendships.findForUser(userId, FriendshipStatus.ACCEPTED).stream().map(f -> f.getRequester().getId() == userId
                 ? f.getAddressee().getId() : f.getRequester().getId()).toList();
     }
-    @Transactional(readOnly = true)
+    @Transactional
     public boolean areFriendsAndNotBlocked(long firstId, long secondId) {
-        return friendships.areFriends(firstId, secondId, FriendshipStatus.ACCEPTED);
+        return friendships.lockPair(firstId, secondId)
+                .filter(friendship -> friendship.getStatus() == FriendshipStatus.ACCEPTED)
+                .isPresent();
     }
 
     private void changeRequest(long userId, long requestId, FriendshipStatus status) {
-        Friendship friendship = friendships.findById(requestId).filter(f -> f.getAddressee().getId() == userId && f.getStatus() == FriendshipStatus.PENDING)
+        Friendship friendship = friendships.lockById(requestId).filter(f -> f.getAddressee().getId() == userId && f.getStatus() == FriendshipStatus.PENDING)
                 .orElseThrow(() -> new FriendRequestNotFoundException("Incoming request not found"));
         friendship.setStatus(status);
         NotificationType notificationType = status == FriendshipStatus.ACCEPTED

@@ -9,6 +9,7 @@ import { PositionBoardEditor } from "../../position/components/PositionBoardEdit
 import {
   chessPieceId,
   emptyFen,
+  fenAfterSetupMove,
   fenBoard,
   normalizeFen,
   pieceToFen,
@@ -153,7 +154,12 @@ export function PositionSetupPage() {
         promotion: "q",
       });
       if (!move) return false;
-      const nextFen = gameRef.current.fen({ forceEnpassantSquare: true });
+      const nextFen = fenAfterSetupMove(
+        gameRef.current.fen(),
+        move.from,
+        move.to,
+        move.piece,
+      );
       setFen(nextFen);
       setSetupMoves((previous) => [...previous, move.san]);
       setSetupFens((previous) => [

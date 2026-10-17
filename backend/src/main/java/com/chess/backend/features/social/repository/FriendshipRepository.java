@@ -18,6 +18,10 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     Optional<Friendship> findPair(@Param("first") long firstId, @Param("second") long secondId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select friendship from Friendship friendship where friendship.id = :id")
+    Optional<Friendship> lockById(@Param("id") long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select friendship from Friendship friendship where "
             + "(friendship.requester.id = :first and friendship.addressee.id = :second) or "
             + "(friendship.requester.id = :second and friendship.addressee.id = :first)")

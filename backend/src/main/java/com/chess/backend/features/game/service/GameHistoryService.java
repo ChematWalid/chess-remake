@@ -132,9 +132,16 @@ public class GameHistoryService {
                 winner, request.isDraw(), reason, challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(),
                 request.totalMoves(), request.pgn(), request.moves(), request.fens(), gameType,
                 setupMoves, setupFens, clock.instant(), request.durationSeconds()));
-        if (request.isDraw()) { white.recordResult(GameResult.DRAW); black.recordResult(GameResult.DRAW); }
-        else if (winner.getId().equals(white.getId())) { white.recordResult(GameResult.WIN); black.recordResult(GameResult.LOSS); }
-        else { black.recordResult(GameResult.WIN); white.recordResult(GameResult.LOSS); }
+        if (request.isDraw()) {
+            users.recordGameResult(white.getId(), GameResult.DRAW);
+            users.recordGameResult(black.getId(), GameResult.DRAW);
+        } else if (winner.getId().equals(white.getId())) {
+            users.recordGameResult(white.getId(), GameResult.WIN);
+            users.recordGameResult(black.getId(), GameResult.LOSS);
+        } else {
+            users.recordGameResult(black.getId(), GameResult.WIN);
+            users.recordGameResult(white.getId(), GameResult.LOSS);
+        }
         challenges.complete(challenge);
         eventPublisher.publishEvent(new GameRecordedEvent(saved.getId(), white.getId(), black.getId()));
         return true;

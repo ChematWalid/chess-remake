@@ -41,6 +41,26 @@ export function normalizeFen(fen: string): string {
   return fields.join(" ");
 }
 
+export function fenAfterSetupMove(
+  fen: string,
+  from: string,
+  to: string,
+  piece: string,
+): string {
+  const fields = normalizeFen(fen).split(" ");
+  fields[3] = "-";
+  const fromRank = Number(from[1]);
+  const toRank = Number(to[1]);
+  if (
+    piece.toLowerCase() === "p" &&
+    from[0] === to[0] &&
+    Math.abs(fromRank - toRank) === 2
+  ) {
+    fields[3] = `${from[0]}${(fromRank + toRank) / 2}`;
+  }
+  return fields.join(" ");
+}
+
 export function fenBoard(fen: string): Record<string, string> {
   const ranks = (fen.split(" ")[0] ?? "").split("/");
   if (ranks.length !== 8) throw new Error("The FEN board needs eight ranks.");

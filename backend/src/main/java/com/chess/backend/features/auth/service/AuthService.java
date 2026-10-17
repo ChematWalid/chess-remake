@@ -184,7 +184,7 @@ public class AuthService {
         if (rawToken == null || rawToken.isBlank()) {
             throw new EmailActionTokenInvalidException("Action token is required");
         }
-        EmailActionToken token = actionTokens.findByTokenHashAndActionAndConsumedAtIsNull(TokenUtils.sha256(rawToken), action)
+        EmailActionToken token = actionTokens.lockActive(TokenUtils.sha256(rawToken), action)
                 .filter(value -> value.getExpiresAt().isAfter(clock.instant()))
                 .orElseThrow(() -> new EmailActionTokenInvalidException("Action token is invalid or expired"));
         token.consume(clock.instant());

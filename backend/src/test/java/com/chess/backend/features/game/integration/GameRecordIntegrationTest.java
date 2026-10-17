@@ -41,9 +41,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -115,10 +115,10 @@ class GameRecordIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private FileStorage fileStorage;
 
-    @MockBean
+    @MockitoBean
     private JavaMailSender mailSender;
 
 
@@ -284,6 +284,33 @@ class GameRecordIntegrationTest {
         assertThat(histories.count()).isEqualTo(1);
         assertThat(users.findById(challenge.getChallenger().getId()).orElseThrow().getTotalGames()).isEqualTo(1);
         assertThat(users.findById(challenge.getChallenged().getId()).orElseThrow().getTotalGames()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentGamesDoNotLosePlayerStatistics() throws Exception {
+        User white = verifiedUser("parallel-white");
+        User black = verifiedUser("parallel-black");
+        GameChallenge firstChallenge = acceptedChallenge("ROOM10", white, black);
+        GameChallenge secondChallenge = acceptedChallenge("ROOM11", white, black);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> first = executor.submit(() -> submitTogether(
+                    payload(firstChallenge, "ROOM10", "ROOM10", false, "1"), ready, start));
+            Future<Integer> second = executor.submit(() -> submitTogether(
+                    payload(secondChallenge, "ROOM11", "ROOM11", false, "1"), ready, start));
+            ready.await();
+            start.countDown();
+
+            assertThat(first.get()).isEqualTo(201);
+            assertThat(second.get()).isEqualTo(201);
+        }
+
+        assertThat(users.findById(white.getId()).orElseThrow().getTotalGames()).isEqualTo(2);
+        assertThat(users.findById(white.getId()).orElseThrow().getWins()).isEqualTo(2);
+        assertThat(users.findById(black.getId()).orElseThrow().getTotalGames()).isEqualTo(2);
+        assertThat(users.findById(black.getId()).orElseThrow().getLosses()).isEqualTo(2);
     }
 
     @Test
@@ -463,6 +490,10 @@ class GameRecordIntegrationTest {
     private GameChallenge acceptedChallenge(String roomCode) {
         User challenger = verifiedUser("white-" + roomCode.toLowerCase());
         User challenged = verifiedUser("black-" + roomCode.toLowerCase());
+        return acceptedChallenge(roomCode, challenger, challenged);
+    }
+
+    private GameChallenge acceptedChallenge(String roomCode, User challenger, User challenged) {
         GameChallenge challenge = new GameChallenge(challenger, challenged, 300, 0, GameSide.WHITE,
                 clock.instant().plus(Duration.ofMinutes(5)));
         challenge.accept(roomCode, GameSide.WHITE, clock.instant());

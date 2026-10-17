@@ -1,6 +1,7 @@
 package com.chess.backend.common.config;
 
 import com.chess.backend.common.security.JwtStompChannelInterceptor;
+import java.util.Arrays;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -29,7 +30,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws").setAllowedOrigins(properties.corsOrigins().split(",")).withSockJS();
+        String[] origins = Arrays.stream(properties.corsOrigins().split(","))
+                .map(String::trim).filter(origin -> !origin.isEmpty()).toArray(String[]::new);
+        registry.addEndpoint("/ws").setAllowedOrigins(origins).withSockJS();
     }
 
     @Override

@@ -101,7 +101,6 @@ public class ProfileService {
             user.isSearchable(), user.getTotalGames(), user.getWins(), user.getLosses(), user.getDraws(), user.getId()); }
     private String avatarUrl(User user) {
         if (user.getAvatarKey() == null) return null;
-        String version = user.getAvatarKey().substring(user.getAvatarKey().lastIndexOf('/') + 1);
-        return "/api/users/" + user.getPublicId() + "/avatar?v=" + version;
+        return "/api/users/" + user.getPublicId() + "/avatar";
     }
 }

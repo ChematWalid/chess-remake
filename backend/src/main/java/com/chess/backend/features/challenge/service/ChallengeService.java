@@ -229,8 +229,6 @@ public class ChallengeService {
     }
 
     private void sendMatch(GameChallenge challenge, User recipient, GameSide color) {
-        String token = jwtService.createRoomToken(challenge.getRoomCode(), recipient.getId(), recipient.getDisplayName(), color,
-                challenge.getInitialTimeSeconds(), challenge.getIncrementSeconds(), challenge.getInitialFen(), challenge.getSetupMoves(), challenge.getSetupFens());
         String url = properties.engineWsUrl();
         messages.publish(recipient.getId(), "/queue/challenges",
                 event(challenge, ChallengeEventType.MATCH_ASSIGNED, ChallengeStatus.ACCEPTED,

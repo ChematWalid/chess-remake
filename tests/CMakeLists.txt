@@ -11,7 +11,7 @@ target_link_libraries(chess_tests
 )
 
 include(GoogleTest)
-gtest_discover_tests(chess_tests)
+gtest_discover_tests(chess_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 # ── server tests ──────────────────────────────────────────────────────────────
 file(GLOB_RECURSE SERVER_TEST_SOURCES CONFIGURE_DEPENDS server/*.cpp)
@@ -24,7 +24,7 @@ if(SERVER_TEST_SOURCES)
                 GTest::gtest_main
     )
 
-    gtest_discover_tests(chess_server_tests)
+    gtest_discover_tests(chess_server_tests PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 endif()
 
 # ── review harnesses ──────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.chess.backend.common.security;
 import com.chess.backend.common.domain.enums.UserRole;
 import com.chess.backend.features.auth.security.JwtService;
 import java.util.List;
+import java.util.Set;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component;
 public class JwtStompChannelInterceptor implements ChannelInterceptor {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final Set<String> ALLOWED_SEND_DESTINATIONS = Set.of(
+            "/app/challenge.send", "/app/challenge.accept", "/app/challenge.decline", "/app/challenge.cancel");
     private static final String USER_QUEUE_PREFIX = "/user/queue/";
     private final JwtService jwtService;
 
@@ -34,6 +37,9 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
         }
         if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             validateSubscription(message, accessor.getDestination());
+        }
+        if (StompCommand.SEND.equals(accessor.getCommand())) {
+            validateSendDestination(message, accessor.getDestination());
         }
         return message;
     }
@@ -54,6 +60,12 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
     private void validateSubscription(Message<?> message, String destination) {
         if (destination == null || !destination.startsWith(USER_QUEUE_PREFIX)) {
             throw new MessageDeliveryException(message, "Subscription destination is not allowed");
+        }
+    }
+
+    private void validateSendDestination(Message<?> message, String destination) {
+        if (destination == null || !ALLOWED_SEND_DESTINATIONS.contains(destination)) {
+            throw new MessageDeliveryException(message, "Send destination is not allowed");
         }
     }
 }
