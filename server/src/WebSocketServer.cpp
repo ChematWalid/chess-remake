@@ -73,6 +73,7 @@ bool WebSocketServer::start() {
                                     }
                                     if (session) {
                                         session->send(Protocol::error("Message payload exceeds maximum allowable size"));
+                                        session->close();
                                     }
                                     return;
                                 }
