@@ -103,6 +103,7 @@ public class ChallengeService {
         if (!challenge.getExpiresAt().isAfter(clock.instant())) {
             challenge.setStatus(ChallengeStatus.EXPIRED);
             notifyStatus(challenge, null, ChallengeStatus.EXPIRED);
+            challenges.delete(challenge);
             return;
         }
         if (!friends.areFriendsAndNotBlocked(challenge.getChallenger().getId(), challenge.getChallenged().getId()))
@@ -177,6 +178,7 @@ public class ChallengeService {
                     "Game room expired before both players connected");
             messages.publish(challenge.getChallenger().getId(), "/topic/challenges", event);
             messages.publish(challenge.getChallenged().getId(), "/topic/challenges", event);
+            challenges.delete(challenge);
         }
     }
 
@@ -197,6 +199,7 @@ public class ChallengeService {
         for (GameChallenge challenge : expired) {
             challenge.setStatus(ChallengeStatus.EXPIRED);
             notifyStatus(challenge, null, ChallengeStatus.EXPIRED);
+            challenges.delete(challenge);
         }
     }
 
