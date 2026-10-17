@@ -25,6 +25,9 @@ import { playUiTone } from "../../../shared/utils/playUiTone";
 import { resolveEngineUrl } from "../utils/resolveEngineUrl";
 import "./GamePage.css";
 
+const PREMOVE_TONE_FREQUENCY = 920;
+const ILLEGAL_MOVE_TONE_FREQUENCY = 280;
+
 interface EngineEvent {
   event?: string;
   fen?: string;
@@ -41,7 +44,6 @@ interface EngineEvent {
   result?: string;
   winner?: GameSide | null;
   reason?: string;
-  message?: string;
   color?: "white" | "black";
 }
 
@@ -214,6 +216,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
   );
   const [selected, setSelected] = useState<Square | null>(null);
   const [boardResetKey, setBoardResetKey] = useState(0);
+  const rightClickStart = useRef<{ x: number; y: number } | null>(null);
+  const rightClickMoved = useRef(false);
   const [premoves, setPremoves] = useState<PendingMove[]>([]);
   const [optimisticMove, setOptimisticMove] = useState<OptimisticMove | null>(
     null,
@@ -255,6 +259,49 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const settingsRef = useRef(preferences.data ?? defaultSettings);
   settingsRef.current = preferences.data ?? defaultSettings;
   const hasClock = clock !== null;
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.button !== 2 ||
+        !(event.target instanceof Element) ||
+        !event.target.closest(".chessboard-frame")
+      ) {
+        return;
+      }
+      rightClickStart.current = { x: event.clientX, y: event.clientY };
+      rightClickMoved.current = false;
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      const start = rightClickStart.current;
+      if (
+        start &&
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6
+      ) {
+        rightClickMoved.current = true;
+      }
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      if (event.button !== 2 || !rightClickStart.current) return;
+      rightClickStart.current = null;
+      if (rightClickMoved.current) {
+        rightClickMoved.current = false;
+        return;
+      }
+      if (livePreferences.current.premoves.length === 0) return;
+      clearPremoves();
+      if (settingsRef.current.gameSoundsEnabled)
+        playUiTone(PREMOVE_TONE_FREQUENCY);
+    };
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerUp, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerup", handlePointerUp, true);
+    };
+  }, []);
 
   useEffect(() => {
     const resetBoardDrag = () => {
@@ -488,12 +535,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
             });
           } else if (event.event === "error") {
             if (optimisticMoveRef.current) clearOptimisticMove();
-            notifications.show({
-              title: "Move rejected",
-              message:
-                event.message ?? "The server could not accept that action.",
-              color: "red",
-            });
+            if (settingsRef.current.gameSoundsEnabled)
+              playUiTone(ILLEGAL_MOVE_TONE_FREQUENCY);
           } else if (event.event === "opponent_disconnected") {
             notifications.show({
               title: "Opponent disconnected",
@@ -816,11 +859,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
       if (prefs.premovesEnabled) {
         const move = { from, to };
         if (!isLegalPremove(displayedFen, move, color)) {
-          notifications.show({
-            title: "Premove not queued",
-            message: "That move is not legal from the planned position.",
-            color: "yellow",
-          });
+          if (settingsRef.current.gameSoundsEnabled)
+            playUiTone(ILLEGAL_MOVE_TONE_FREQUENCY);
           setSelected(null);
           return;
         }
@@ -837,11 +877,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
         ];
         updatePremoves(nextPremoves);
         setSelected(null);
-        notifications.show({
-          title: "Premove queued",
-          message: `Premove ${nextPremoves.length} will be sent in order when it becomes your turn.`,
-          autoClose: 1800,
-        });
+        if (settingsRef.current.gameSoundsEnabled)
+          playUiTone(PREMOVE_TONE_FREQUENCY);
       }
       return;
     }
@@ -849,6 +886,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
       .moves({ square: from, verbose: true })
       .filter((move) => move.to === to);
     if (!available.length) {
+      if (settingsRef.current.gameSoundsEnabled)
+        playUiTone(ILLEGAL_MOVE_TONE_FREQUENCY);
       setSelected(null);
       return;
     }
@@ -885,12 +924,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
       .some((move) => move.to === queued.to);
     if (!isLegal) {
       updatePremoves([]);
-      notifications.show({
-        title: "Premove cancelled",
-        message:
-          "That move is no longer legal. The remaining premoves were cancelled.",
-        color: "yellow",
-      });
+      if (settingsRef.current.gameSoundsEnabled)
+        playUiTone(ILLEGAL_MOVE_TONE_FREQUENCY);
       return;
     }
     if (sendEngineMove(queued, currentFen))

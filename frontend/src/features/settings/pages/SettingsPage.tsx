@@ -285,7 +285,7 @@ export function SettingsPage() {
                 />
                 <SettingToggle
                   label="Game sounds"
-                  description="Play sounds for moves and game events."
+                  description="Play sounds for moves, premoves, and illegal moves."
                   checked={draft.gameSoundsEnabled}
                   onChange={(checked) => set("gameSoundsEnabled", checked)}
                 />
