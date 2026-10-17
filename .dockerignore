@@ -1,0 +1,16 @@
+.git
+.agent-out
+.outbox
+.vscode
+.env
+.env.*
+**/.env
+**/.env.*
+**/node_modules
+**/target
+**/dist
+**/build
+**/CMakeFiles
+**/_deps
+**/.outbox
+backend/uploads

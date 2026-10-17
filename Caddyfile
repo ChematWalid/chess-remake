@@ -1,0 +1,46 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000"
+	}
+
+	handle_path /engine/* {
+		reverse_proxy chess-server:9002
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /oauth2/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /login/oauth2/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /ws {
+		reverse_proxy backend:8080
+	}
+
+	handle /ws/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /actuator/health/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

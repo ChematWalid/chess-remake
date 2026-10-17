@@ -37,3 +37,7 @@ backend/target/
 backend/.env
 server/.env
 backend/uploads/
+.env
+.env.dev
+.env.deploy
+.env.*.local
