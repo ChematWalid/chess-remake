@@ -596,6 +596,100 @@ test("unlimited clocks and delayed turn updates dispatch queued moves on sync", 
   await expect(page.getByText("∞")).toHaveCount(2);
 });
 
+test("turn indicator follows the board when viewing as Black", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.route("**/api/users/me/settings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(preferences),
+    }),
+  );
+  await page.route("**/api/users/turn_rival/profile", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        ...profile,
+        username: "turn_rival",
+        displayName: "Rival",
+      }),
+    }),
+  );
+  await page.route("**/api/challenges/52", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        challengeId: 52,
+        status: "ACCEPTED",
+        opponentPublicUserId: "223e4567-e89b-42d3-a456-426614174000",
+        opponentUsername: "turn_rival",
+        initialTimeSeconds: null,
+        incrementSeconds: null,
+        challengerSide: "WHITE",
+        playerColor: "BLACK",
+        roomCode: "ROOM52",
+        initialFen: null,
+        setupMoves: [],
+        setupFens: [],
+        connectUrl: "ws://engine.test/black-game",
+        token: "test-token",
+        expiresAt: "2030-01-01T00:00:00Z",
+      }),
+    }),
+  );
+
+  const blackToMove = new Chess(
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+  );
+  await page.routeWebSocket("ws://engine.test/black-game", (route) => {
+    route.onMessage((message) => {
+      const event = JSON.parse(String(message)) as { action?: string };
+      if (event.action !== "connect_token") return;
+      route.send(
+        JSON.stringify({
+          event: "room_joined",
+          room_code: "ROOM52",
+          role: "black",
+        }),
+      );
+      route.send(
+        JSON.stringify({
+          event: "game_started",
+          room_code: "ROOM52",
+          fen: blackToMove.fen(),
+          time_control: "unlimited",
+          white_time_ms: -1,
+          black_time_ms: -1,
+          moves: [],
+          setup_moves: [],
+          setup_fens: [],
+        }),
+      );
+    });
+  });
+
+  await page.goto(`${appUrl}/game/52`);
+
+  const strips = page.locator(".opponent-strip");
+  await expect(strips.first().locator(".game-player-identity")).toHaveAttribute(
+    "aria-label",
+    "Rival, White",
+  );
+  await expect(
+    strips.first().locator(".game-player-identity--active"),
+  ).toHaveCount(0);
+  await expect(
+    strips.last().locator(".game-player-identity--active"),
+  ).toHaveCount(1);
+  await expect(strips.last().locator(".game-player-identity-turn")).toHaveText(
+    "To move",
+  );
+});
+
 async function installAuthenticatedSession(page: Page) {
   await page.route("**/api/auth/refresh", (route) =>
     route.fulfill({
