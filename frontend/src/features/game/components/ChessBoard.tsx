@@ -23,13 +23,8 @@ const spritePieces: PieceRenderObject = Object.fromEntries(
           <div
             className={`sprite-piece sprite-${color}`}
             style={{
-              backgroundColor: color === "w" ? "#f8f5e9" : "#202820",
-              maskImage: `url(${piecesSprite})`,
-              WebkitMaskImage: `url(${piecesSprite})`,
-              maskSize: "600% 200%",
-              WebkitMaskSize: "600% 200%",
-              maskPosition: `${column * 20}% 0%`,
-              WebkitMaskPosition: `${column * 20}% 0%`,
+              backgroundImage: `url(${piecesSprite})`,
+              backgroundPosition: `${column * 20}% 0%`,
             }}
             aria-label={`${color === "w" ? "White" : "Black"} ${piece}`}
           />

@@ -16,6 +16,7 @@ import { ChessBoard } from "../components/ChessBoard";
 import { GameMovesPanel } from "../components/GameMovesPanel";
 import { MoveDialogs, type PendingMove } from "../components/MoveDialogs";
 import { playUiTone } from "../../../shared/utils/playUiTone";
+import { resolveEngineUrl } from "../utils/resolveEngineUrl";
 import "./GamePage.css";
 
 interface EngineEvent {
@@ -101,7 +102,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
         setFinished("This accepted game is no longer available.");
         return;
       }
-      const ws = new WebSocket(connection.connectUrl);
+      const ws = new WebSocket(resolveEngineUrl(connection.connectUrl));
       socket.current = ws;
       ws.onopen = () => {
         ws.send(JSON.stringify({

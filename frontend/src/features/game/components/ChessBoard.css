@@ -6,7 +6,10 @@
 .sprite-piece {
   width: 100%;
   height: 100%;
-  mask-repeat: no-repeat;
-  -webkit-mask-repeat: no-repeat;
+  background-repeat: no-repeat;
+  background-size: 600% 200%;
   filter: drop-shadow(0 1px 1px #0007);
+}
+.sprite-piece.sprite-b {
+  filter: brightness(0.16) drop-shadow(0 0 1px #fff8);
 }
