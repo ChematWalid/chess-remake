@@ -1,5 +1,5 @@
 import { Button, Group, Select, Stack, Text } from "@mantine/core";
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 import { useEffect, useRef, useState } from "react";
 import type { ChessboardOptions } from "react-chessboard";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -53,6 +53,7 @@ export function PositionSetupPage() {
       : "STANDARD",
   );
   const [piece, setPiece] = useState<BoardPiece | null>(null);
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [fenInput, setFenInput] = useState(
     importedPosition?.fen ?? standardFen,
   );
@@ -79,6 +80,7 @@ export function PositionSetupPage() {
     setSetupFens(value.setupFens);
     gameRef.current = value.mode === "MOVES" ? new Chess(value.fen) : null;
     setPiece(null);
+    setSelectedSquare(null);
   }
 
   function commitSnapshot(value: EditorSnapshot) {
@@ -186,6 +188,23 @@ export function PositionSetupPage() {
   }
 
   function handleSquareClick(square: string) {
+    if (mode === "MOVES") {
+      const game = gameRef.current ?? new Chess(fen);
+      if (!selectedSquare) {
+        if (game.get(square as Square)?.color === game.turn())
+          setSelectedSquare(square);
+        return;
+      }
+      if (selectedSquare === square) {
+        setSelectedSquare(null);
+        return;
+      }
+      const moved = playSetupMove(selectedSquare, square);
+      if (moved) setSelectedSquare(null);
+      else if (game.get(square as Square)?.color === game.turn())
+        setSelectedSquare(square);
+      return;
+    }
     if (mode !== "DIRECT") return;
     try {
       const board = fenBoard(fen);
@@ -205,28 +224,7 @@ export function PositionSetupPage() {
     }
   }
 
-  function handlePieceDrop({
-    piece: pieceId,
-    sourceSquare,
-    targetSquare,
-  }: {
-    piece: string;
-    sourceSquare: string;
-    targetSquare: string;
-  }): boolean {
-    if (mode === "DIRECT") {
-      const selected = chessPieceId(pieceId);
-      if (!selected) return false;
-      const board = fenBoard(fen);
-      delete board[sourceSquare];
-      board[targetSquare] = pieceToFen[selected];
-      const fields = fen.split(" ");
-      fields[2] = "-";
-      fields[3] = "-";
-      const nextFen = serializeFenBoard(board, fields);
-      commitSnapshot({ ...snapshot(), fen: nextFen, start: "CUSTOM" });
-      return true;
-    }
+  function playSetupMove(sourceSquare: string, targetSquare: string): boolean {
     if (setupMoves.length >= 300) return false;
     try {
       if (!gameRef.current) gameRef.current = new Chess(fen);
@@ -252,6 +250,31 @@ export function PositionSetupPage() {
     } catch {
       return false;
     }
+  }
+
+  function handlePieceDrop({
+    piece: pieceId,
+    sourceSquare,
+    targetSquare,
+  }: {
+    piece: string;
+    sourceSquare: string;
+    targetSquare: string;
+  }): boolean {
+    if (mode === "DIRECT") {
+      const selected = chessPieceId(pieceId);
+      if (!selected) return false;
+      const board = fenBoard(fen);
+      delete board[sourceSquare];
+      board[targetSquare] = pieceToFen[selected];
+      const fields = fen.split(" ");
+      fields[2] = "-";
+      fields[3] = "-";
+      const nextFen = serializeFenBoard(board, fields);
+      commitSnapshot({ ...snapshot(), fen: nextFen, start: "CUSTOM" });
+      return true;
+    }
+    return playSetupMove(sourceSquare, targetSquare);
   }
 
   function savePosition() {
@@ -351,7 +374,7 @@ export function PositionSetupPage() {
           <Button
             variant={mode === "DIRECT" ? "filled" : "default"}
             aria-pressed={mode === "DIRECT"}
-            onClick={() => setMode("DIRECT")}
+            onClick={() => switchMode("DIRECT")}
           >
             Arrange pieces
           </Button>
@@ -378,6 +401,7 @@ export function PositionSetupPage() {
               mode={mode}
               fen={fen}
               selectedPiece={piece}
+              selectedSquare={selectedSquare}
               onFenChange={(value) => {
                 let nextFen = value;
                 if (value.split(" ")[1] !== fen.split(" ")[1]) {

@@ -166,10 +166,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const preferences = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
-    initialData: defaultSettings,
   });
-  const settingsRef = useRef(preferences.data);
-  settingsRef.current = preferences.data;
+  const settingsRef = useRef(preferences.data ?? defaultSettings);
+  settingsRef.current = preferences.data ?? defaultSettings;
   const hasClock = clock !== null;
 
   function clearOptimisticMove() {
@@ -419,17 +418,15 @@ export function GamePage({ live = false }: { live?: boolean }) {
     })();
     const timer = window.setInterval(
       () =>
-        setClock((current) =>
-          current
-            ? {
-                ...current,
-                [sideToMove === "w" ? "white" : "black"]: Math.max(
-                  0,
-                  current[sideToMove === "w" ? "white" : "black"] - 250,
-                ),
-              }
-            : current,
-        ),
+        setClock((current) => {
+          if (!current) return current;
+          const activeClock = sideToMove === "w" ? "white" : "black";
+          if (current[activeClock] < 0) return current;
+          return {
+            ...current,
+            [activeClock]: Math.max(0, current[activeClock] - 250),
+          };
+        }),
       250,
     );
     return () => window.clearInterval(timer);
@@ -588,7 +585,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
         .find((square) => square !== null) ?? null
     );
   }, [displayedFen]);
-  const prefs = preferences.data;
+  const prefs = preferences.data ?? defaultSettings;
   const colors =
     prefs.boardOrientation === "AUTO"
       ? color

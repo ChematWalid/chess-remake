@@ -29,6 +29,7 @@ interface PositionBoardEditorProps {
   mode: "MOVES" | "DIRECT";
   fen: string;
   selectedPiece: BoardPiece | null;
+  selectedSquare?: string | null;
   onFenChange: (fen: string) => void;
   onPieceSelect: (piece: BoardPiece | null) => void;
   onSquareClick: (square: string) => void;
@@ -39,6 +40,7 @@ export function PositionBoardEditor({
   mode,
   fen,
   selectedPiece,
+  selectedSquare = null,
   onFenChange,
   onPieceSelect,
   onSquareClick,
@@ -128,7 +130,9 @@ export function PositionBoardEditor({
         </>
       ) : (
         <Text size="sm">
-          Make legal moves on the board. The side to move follows the sequence.
+          Click a piece and its destination, or drag it. The side to move
+          follows the sequence.
+          {selectedSquare ? ` Selected ${selectedSquare}.` : ""}
         </Text>
       )}
     </Stack>

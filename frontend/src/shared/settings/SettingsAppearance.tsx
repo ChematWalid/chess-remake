@@ -12,7 +12,6 @@ export function SettingsAppearance({ children }: PropsWithChildren) {
   const { data = defaultSettings } = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
-    initialData: defaultSettings,
     enabled: isAuthenticated,
   });
   const [systemTheme, setSystemTheme] = useState(
