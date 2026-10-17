@@ -226,12 +226,24 @@ test("offline position edits restore locally and sync after reconnecting", async
   await expect(page.getByText("Draft saved to your account.")).toBeVisible();
 });
 
-test("profile data is shown from the browser cache after a reload", async ({
+test("cached profile data shows immediately and refreshes in the background", async ({
   page,
 }) => {
   let profileRequests = 0;
-  await installApi(page, () => {
+  await installApi(page);
+  await page.unroute("**/api/users/me");
+  await page.route("**/api/users/me", async (route) => {
     profileRequests += 1;
+    if (profileRequests > 1)
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        ...profile,
+        displayName: profileRequests > 1 ? "Updated Cache Test" : "Cache Test",
+      }),
+    });
   });
 
   await page.goto(`${appUrl}/profile`);
@@ -246,7 +258,10 @@ test("profile data is shown from the browser cache after a reload", async ({
   await expect(
     page.getByRole("heading", { name: "Your profile" }),
   ).toBeVisible();
-  await expect.poll(() => profileRequests).toBe(1);
+  const displayName = page.getByRole("textbox", { name: "Display name" });
+  await expect(displayName).toHaveValue("Cache Test");
+  await expect.poll(() => profileRequests).toBe(2);
+  await expect(displayName).toHaveValue("Updated Cache Test");
 });
 
 test("draft restoration does not overwrite edits made during an IndexedDB read", async ({
@@ -335,7 +350,9 @@ test("offline draft sync adopts a newer server version", async ({ page }) => {
   expect(submittedEditAt).toBeDefined();
 });
 
-test("clearing a draft reports pending removal while offline", async ({ page }) => {
+test("clearing a draft reports pending removal while offline", async ({
+  page,
+}) => {
   await installApi(page);
   let savedDraft: {
     featureKey: string;
@@ -362,9 +379,9 @@ test("clearing a draft reports pending removal while offline", async ({ page }) 
   });
 
   await page.goto(`${appUrl}/search`);
-  await expect(page.getByRole("textbox", { name: "Search players" })).toHaveValue(
-    "saved search",
-  );
+  await expect(
+    page.getByRole("textbox", { name: "Search players" }),
+  ).toHaveValue("saved search");
   await page.context().setOffline(true);
   await page.getByRole("button", { name: "Clear saved draft" }).click();
   await expect(
