@@ -5,9 +5,12 @@ import {
   IconDeviceGamepad2,
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../../shared/auth/AuthProvider";
 import "./LandingPage.css";
 
 export function LandingPage() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <main className="landing-page">
       <header>
@@ -16,12 +19,20 @@ export function LandingPage() {
           <span>rook</span>
         </Link>
         <Group>
-          <Button component={Link} to="/login" variant="subtle" color="gray">
-            Sign in
-          </Button>
-          <Button component={Link} to="/register">
-            Join free
-          </Button>
+          {isAuthenticated ? (
+            <Button component={Link} to="/play">
+              Play
+            </Button>
+          ) : (
+            <>
+              <Button component={Link} to="/login" variant="subtle" color="gray">
+                Sign in
+              </Button>
+              <Button component={Link} to="/register">
+                Join free
+              </Button>
+            </>
+          )}
         </Group>
       </header>
       <section className="landing-hero">
@@ -41,21 +52,23 @@ export function LandingPage() {
           <Group mt="xl">
             <Button
               component={Link}
-              to="/register"
+              to={isAuthenticated ? "/play" : "/register"}
               size="md"
               rightSection={<IconArrowUpRight size={18} />}
             >
-              Get started
+              {isAuthenticated ? "Start playing" : "Get started"}
             </Button>
-            <Button
-              component={Link}
-              to="/login"
-              size="md"
-              variant="subtle"
-              color="gray"
-            >
-              I have an account
-            </Button>
+            {!isAuthenticated && (
+              <Button
+                component={Link}
+                to="/login"
+                size="md"
+                variant="subtle"
+                color="gray"
+              >
+                I have an account
+              </Button>
+            )}
           </Group>
         </div>
         <div className="hero-board" aria-label="Chess board illustration">

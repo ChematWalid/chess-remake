@@ -6,6 +6,26 @@
   background: var(--surface);
   border-color: var(--line);
 }
+.side-nav-resize {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.side-nav-resize:hover,
+.side-nav-resize.is-resizing {
+  background: var(--accent);
+  opacity: 0.45;
+}
+@media (max-width: 48em) {
+  .side-nav-resize {
+    display: none;
+  }
+}
 .brand {
   color: var(--text);
   display: inline-flex;

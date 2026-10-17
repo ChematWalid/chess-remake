@@ -28,4 +28,4 @@ std::string BoardRenderer::render(const Board& board) {
     return oss.str();
 }
 
-} ::cli
+}

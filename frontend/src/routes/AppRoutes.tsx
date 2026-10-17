@@ -106,7 +106,6 @@ function LoginRoute() {
 }
 
 export function AppRoutes() {
-  const { isAuthenticated } = useAuth();
   return (
     <RealtimeProvider>
       <AssignedGameNavigator />
@@ -114,16 +113,7 @@ export function AppRoutes() {
         fallback={<main className="public-loading">Loading page…</main>}
       >
         <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/play" replace />
-              ) : (
-                <LandingPage />
-              )
-            }
-          />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/register" element={<AuthPage mode="register" />} />
           <Route

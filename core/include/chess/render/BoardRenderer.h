@@ -24,4 +24,4 @@ public:
     static std::string render(const Board& board);
 };
 
-} ::cli
+}
