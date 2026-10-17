@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { notifications } from "@mantine/notifications";
+import { InviteLinkCard } from "../components/InviteLinkCard";
 import {
   EmptyState,
   ErrorState,
@@ -23,6 +24,7 @@ import {
 
 export function FriendsPage() {
   const [tab, setTab] = useState<string | null>("friends");
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const cache = useQueryClient();
   const friends = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const incoming = useQuery({
@@ -60,17 +62,23 @@ export function FriendsPage() {
   });
   const invite = useMutation({
     mutationFn: createFriendInvite,
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       const url = result.path.startsWith("http")
         ? result.path
         : `${window.location.origin}${result.path}`;
-      await navigator.clipboard.writeText(url);
+      setInviteUrl(url);
       notifications.show({
-        title: "Invite copied",
-        message: "Share the one-time link with a friend.",
+        title: "Invite link ready",
+        message: "Copy the link below and share it with a friend.",
         color: "green",
       });
     },
+    onError: (error: Error) =>
+      notifications.show({
+        title: "Could not create invite",
+        message: error.message,
+        color: "red",
+      }),
   });
 
   return (
@@ -89,6 +97,7 @@ export function FriendsPage() {
           Invite a friend
         </Button>
       </header>
+      {inviteUrl && <InviteLinkCard key={inviteUrl} url={inviteUrl} />}
       <Tabs value={tab} onChange={setTab} keepMounted={false}>
         <Tabs.List>
           <Tabs.Tab value="friends">Friends</Tabs.Tab>

@@ -54,7 +54,16 @@ export const profileSchema = z.object({
   draws: z.number().int(),
 });
 export type Profile = z.infer<typeof profileSchema>;
-export const searchResultSchema = profileSchema;
+export const searchResultSchema = z.object({
+  publicId: z.string().uuid(),
+  username: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.string().nullable(),
+  totalGames: z.number().int(),
+  wins: z.number().int(),
+  losses: z.number().int(),
+  draws: z.number().int(),
+});
 export type SearchResult = z.infer<typeof searchResultSchema>;
 
 export const presenceStatusSchema = z.enum(["ONLINE", "IN_GAME", "OFFLINE"]);
