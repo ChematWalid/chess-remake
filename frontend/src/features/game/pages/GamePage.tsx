@@ -7,12 +7,14 @@ import { useParams } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import type { ChessboardOptions } from "react-chessboard";
 import type { ChallengeDetail, GameDetail } from "../../../shared/api/types";
+import { useAuth } from "../../../shared/auth/AuthProvider";
 import { defaultSettings } from "../../../shared/api/types";
 import { ErrorState, LoadingState } from "../../../shared/components/PageState";
 import { getChallenge } from "../../challenge/api/challengeApi";
 import { downloadPgn as fetchPgn, getGame } from "../api/gameApi";
-import { getSettings } from "../../user/api/userApi";
+import { getMyProfile, getProfile, getSettings } from "../../user/api/userApi";
 import { ChessBoard } from "../components/ChessBoard";
+import { GamePlayerIdentity } from "../components/GamePlayerIdentity";
 import { GameMovesPanel } from "../components/GameMovesPanel";
 import { MoveDialogs, type PendingMove } from "../components/MoveDialogs";
 import { playUiTone } from "../../../shared/utils/playUiTone";
@@ -90,6 +92,7 @@ function projectPremove(
 
 export function GamePage({ live = false }: { live?: boolean }) {
   const { id = "0", challengeId = "0" } = useParams();
+  const { user } = useAuth();
   const [fen, setFen] = useState("start");
   const [moveText, setMoveText] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
@@ -354,6 +357,54 @@ export function GamePage({ live = false }: { live?: boolean }) {
     live && detail.data && "opponentUsername" in detail.data
       ? detail.data.opponentUsername
       : null;
+  const whiteUsername = replay
+    ? replay.summary.whiteUsername
+    : color === "white"
+      ? user?.username
+      : opponentUsername;
+  const blackUsername = replay
+    ? replay.summary.blackUsername
+    : color === "black"
+      ? user?.username
+      : opponentUsername;
+  const whiteProfile = useQuery({
+    queryKey: ["game-player-profile", whiteUsername],
+    queryFn: () =>
+      live && whiteUsername === user?.username
+        ? getMyProfile()
+        : getProfile(whiteUsername!),
+    enabled: Boolean(whiteUsername),
+    staleTime: 5 * 60 * 1000,
+  });
+  const blackProfile = useQuery({
+    queryKey: ["game-player-profile", blackUsername],
+    queryFn: () =>
+      live && blackUsername === user?.username
+        ? getMyProfile()
+        : getProfile(blackUsername!),
+    enabled: Boolean(blackUsername),
+    staleTime: 5 * 60 * 1000,
+  });
+  const whitePlayer = {
+    username: whiteUsername ?? "white",
+    displayName: whiteProfile.data?.displayName ?? whiteUsername ?? "White",
+    avatarUrl: whiteProfile.data?.avatarUrl ?? null,
+  };
+  const blackPlayer = {
+    username: blackUsername ?? "black",
+    displayName: blackProfile.data?.displayName ?? blackUsername ?? "Black",
+    avatarUrl: blackProfile.data?.avatarUrl ?? null,
+  };
+  const topPlayer = live
+    ? color === "white"
+      ? { ...blackPlayer, side: "Black" as const }
+      : { ...whitePlayer, side: "White" as const }
+    : { ...blackPlayer, side: "Black" as const };
+  const bottomPlayer = live
+    ? color === "white"
+      ? { ...whitePlayer, side: "White" as const }
+      : { ...blackPlayer, side: "Black" as const }
+    : { ...whitePlayer, side: "White" as const };
   const currentFen = replay
     ? (replay.fens[index] ?? replay.fens[0] ?? new Chess().fen())
     : fen === "start"
@@ -579,13 +630,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
       <div className="game-layout">
         <section className="board-column">
           <div className="opponent-strip">
-            <Text fw={600}>
-              {live
-                ? opponentUsername
-                  ? `Opponent · ${opponentUsername}`
-                  : "Opponent"
-                : summary?.blackUsername}
-            </Text>
+            <GamePlayerIdentity {...topPlayer} />
             {clock && (
               <Text className="clock">
                 {formatClock(clock[color === "white" ? "black" : "white"])}
@@ -599,12 +644,15 @@ export function GamePage({ live = false }: { live?: boolean }) {
           />
           {live && (
             <div className="opponent-strip">
-              <Text fw={600}>
-                You · {color === "white" ? "White" : "Black"}
-              </Text>
+              <GamePlayerIdentity {...bottomPlayer} />
               {clock && (
                 <Text className="clock">{formatClock(clock[color])}</Text>
               )}
+            </div>
+          )}
+          {!live && (
+            <div className="opponent-strip">
+              <GamePlayerIdentity {...bottomPlayer} />
             </div>
           )}
           {live && (
