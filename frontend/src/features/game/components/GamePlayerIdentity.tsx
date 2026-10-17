@@ -40,13 +40,14 @@ export function GamePlayerIdentity({
         <Text size="xs" c="dimmed" truncate>
           @{username} · {side}
         </Text>
-        {isActive && showTurnIndicator && (
+        {showTurnIndicator && (
           <Text
             size="xs"
             fw={700}
-            className="game-player-identity-turn"
-            role="status"
-            aria-live="polite"
+            className={`game-player-identity-turn${isActive ? "" : " game-player-identity-turn--hidden"}`}
+            role={isActive ? "status" : undefined}
+            aria-live={isActive ? "polite" : undefined}
+            aria-hidden={!isActive}
           >
             To move
           </Text>

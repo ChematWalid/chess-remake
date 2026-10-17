@@ -12,4 +12,9 @@
 }
 .game-player-identity-turn {
   color: var(--accent);
+  min-height: 1rem;
+  line-height: 1rem;
+}
+.game-player-identity-turn--hidden {
+  visibility: hidden;
 }
