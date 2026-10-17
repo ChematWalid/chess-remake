@@ -19,7 +19,7 @@ require_configured() {
     local value
     value="$(get_value "$key")"
     case "$value" in
-        ""|region|*replace-with*|*example.com*|*namespace.compat.objectstorage.region*)
+        ""|region|*replace-with*|*example.com*)
             printf '%s needs a real deployment value in .env.deploy.\n' "$key" >&2
             exit 1
             ;;
@@ -35,7 +35,12 @@ do
     require_configured "$key"
 done
 
-for key in APP_JWT_SECRET APP_ENGINE_JWT_SECRET APP_INTERNAL_TOKEN DB_PASSWORD
+if [[ "$(get_value APP_S3_ENDPOINT)" != "http://minio:9000" ]]; then
+    printf 'APP_S3_ENDPOINT must be http://minio:9000 for the self-hosted deployment.\n' >&2
+    exit 1
+fi
+
+for key in APP_JWT_SECRET APP_ENGINE_JWT_SECRET APP_INTERNAL_TOKEN DB_PASSWORD APP_S3_SECRET_KEY
 do
     value="$(get_value "$key")"
     if [[ ${#value} -lt 32 ]]; then
