@@ -8,12 +8,16 @@ import {
 import { Link } from "react-router-dom";
 import type { GameDetail } from "../../../shared/api/types";
 import { EmptyState } from "../../../shared/components/PageState";
+import type { PendingMove } from "./MoveDialogs";
+import { PremoveQueue } from "./PremoveQueue";
 
 interface GameMovesPanelProps {
   live: boolean;
   connected: boolean;
   moveText: string[];
-  premove: { from: string; to: string } | null;
+  premoves: PendingMove[];
+  onPremoveRemove: (index: number) => void;
+  onPremovesClear: () => void;
   replay: GameDetail | null;
   index: number;
   playing: boolean;
@@ -25,7 +29,9 @@ export function GameMovesPanel({
   live,
   connected,
   moveText,
-  premove,
+  premoves,
+  onPremoveRemove,
+  onPremovesClear,
   replay,
   index,
   playing,
@@ -54,11 +60,11 @@ export function GameMovesPanel({
               description="Make the first move on the board."
             />
           )}
-          {premove && (
-            <Text size="sm" c="dimmed">
-              Premove queued: {premove.from} → {premove.to}
-            </Text>
-          )}
+          <PremoveQueue
+            premoves={premoves}
+            onRemove={onPremoveRemove}
+            onClear={onPremovesClear}
+          />
         </>
       ) : replay ? (
         <>

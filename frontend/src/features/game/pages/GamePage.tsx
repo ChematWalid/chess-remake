@@ -37,7 +37,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const [fen, setFen] = useState("start");
   const [moveText, setMoveText] = useState<string[]>([]);
   const [selected, setSelected] = useState<Square | null>(null);
-  const [premove, setPremove] = useState<PendingMove | null>(null);
+  const [premoves, setPremoves] = useState<PendingMove[]>([]);
   const [pending, setPending] = useState<PendingMove | null>(null);
   const [promotion, setPromotion] = useState<PendingMove | null>(null);
   const [color, setColor] = useState<"white" | "black">("white");
@@ -49,8 +49,8 @@ export function GamePage({ live = false }: { live?: boolean }) {
     null,
   );
   const socket = useRef<WebSocket | null>(null);
-  const livePreferences = useRef({ color, premove });
-  livePreferences.current = { color, premove };
+  const livePreferences = useRef({ color, premoves });
+  livePreferences.current = { color, premoves };
   const detail = useQuery<ChallengeDetail | GameDetail>({
     queryKey: live ? ["challenge-detail", challengeId] : ["game", id],
     queryFn: async () =>
@@ -167,19 +167,22 @@ export function GamePage({ live = false }: { live?: boolean }) {
                 playUiTone(event.san.includes("x") ? 520 : 660);
             }
             setSelected(null);
-            const queued = livePreferences.current.premove;
+            const queuedPremoves = livePreferences.current.premoves;
+            const queued = queuedPremoves[0];
             if (
               queued &&
               event.side_to_move === livePreferences.current.color
             ) {
-              if (!sendEngineMove(queued, event.fen))
+              updatePremoves(queuedPremoves.slice(1));
+              if (!sendEngineMove(queued, event.fen)) {
+                updatePremoves([]);
                 notifications.show({
                   title: "Premove cancelled",
                   message:
-                    "That move is no longer legal in the current position.",
+                    "That move is no longer legal. The remaining premoves were cancelled.",
                   color: "yellow",
                 });
-              setPremove(null);
+              }
             }
           } else if (event.event === "game_over") {
             setFinished(
@@ -187,7 +190,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
                 ? `${event.result ?? "Game over"} · ${event.reason}`
                 : (event.result ?? "Game over"),
             );
-            setPremove(null);
+            updatePremoves([]);
           } else if (event.event === "error") {
             notifications.show({
               title: "Move rejected",
@@ -315,14 +318,35 @@ export function GamePage({ live = false }: { live?: boolean }) {
     }
   }
 
+  function updatePremoves(nextPremoves: PendingMove[]) {
+    livePreferences.current = {
+      ...livePreferences.current,
+      premoves: nextPremoves,
+    };
+    setPremoves(nextPremoves);
+  }
+
+  function removePremove(index: number) {
+    updatePremoves(livePreferences.current.premoves.filter((_, i) => i !== index));
+  }
+
+  function clearPremoves() {
+    updatePremoves([]);
+  }
+
   function attemptMove(from: Square, to: Square) {
     const game = new Chess(currentFen);
     if (turn !== (color === "white" ? "w" : "b")) {
       if (prefs.premovesEnabled) {
-        setPremove({ from, to });
+        const nextPremoves = [
+          ...livePreferences.current.premoves,
+          { from, to },
+        ];
+        updatePremoves(nextPremoves);
+        setSelected(null);
         notifications.show({
           title: "Premove queued",
-          message: "Your move will be sent when it becomes your turn.",
+          message: `Premove ${nextPremoves.length} will be sent in order when it becomes your turn.`,
           autoClose: 1800,
         });
       }
@@ -511,7 +535,9 @@ export function GamePage({ live = false }: { live?: boolean }) {
           live={live}
           connected={connected}
           moveText={moveText}
-          premove={premove}
+          premoves={premoves}
+          onPremoveRemove={removePremove}
+          onPremovesClear={clearPremoves}
           replay={replay}
           index={index}
           playing={playing}

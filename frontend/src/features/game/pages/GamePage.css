@@ -43,6 +43,17 @@
   padding: 0.2rem;
   border-radius: 5px;
 }
+.premove-queue {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.premove-queue-item {
+  min-height: 30px;
+  padding-inline: 0.35rem;
+  border-radius: 6px;
+  background: var(--surface-raised);
+}
 .game-result {
   margin-top: 1rem;
   padding: 1rem;

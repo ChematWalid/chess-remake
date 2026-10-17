@@ -242,8 +242,8 @@ export function SettingsPage() {
                   onChange={(checked) => set("showLegalMoveHints", checked)}
                 />
                 <SettingToggle
-                  label="Allow one premove"
-                  description="Queue one move while it is your opponent’s turn."
+                  label="Allow premoves"
+                  description="Queue several moves and cancel them before they are played."
                   checked={draft.premovesEnabled}
                   onChange={(checked) => set("premovesEnabled", checked)}
                 />
