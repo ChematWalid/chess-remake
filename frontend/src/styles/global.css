@@ -1,0 +1,121 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #e7e9e3;
+  background: #121411;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --surface: #191c18;
+  --surface-raised: #20241f;
+  --line: #2a3029;
+  --text: #e7e9e3;
+  --muted: #969d92;
+  --accent: #9fca91;
+  --accent-soft: #29372a;
+  --hover: #222820;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #121411;
+}
+a {
+  color: var(--accent);
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+.page-heading h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  letter-spacing: -0.045em;
+}
+.page-heading p {
+  color: var(--muted);
+  margin: 0.45rem 0 0;
+}
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+}
+.empty-state h2 {
+  color: var(--text);
+  font-size: 1rem;
+  margin: 0 0 0.45rem;
+}
+.empty-state p {
+  margin: 0;
+}
+.text-button {
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0.4rem;
+}
+.text-button:hover {
+  text-decoration: underline;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+[data-theme="light"] {
+  color-scheme: light;
+  color: #20251f;
+  background: #f5f6f2;
+  --surface: #ffffff;
+  --surface-raised: #eef1eb;
+  --line: #dce1d8;
+  --text: #20251f;
+  --muted: #687064;
+  --accent: #376d35;
+  --accent-soft: #e2eedf;
+  --hover: #eef3eb;
+}
+[data-theme="light"] body {
+  background: #f5f6f2;
+}
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+[data-motion="full"] * {
+  scroll-behavior: smooth;
+}

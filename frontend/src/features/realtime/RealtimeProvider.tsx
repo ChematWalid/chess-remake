@@ -1,0 +1,209 @@
+import { Client, type IMessage } from "@stomp/stompjs";
+import SockJS from "sockjs-client";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from "react";
+import { notifications } from "@mantine/notifications";
+import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { getAccessToken } from "../../shared/api/client";
+import {
+  challengeEventSchema,
+  presenceEventSchema,
+  userNotificationSchema,
+  type BackendError,
+} from "../../shared/api/types";
+import { useAuth } from "../../shared/auth/AuthProvider";
+import { defaultSettings } from "../../shared/api/types";
+import { getSettings } from "../user/api/userApi";
+import { playUiTone } from "../../shared/utils/playUiTone";
+
+interface RealtimeValue {
+  connected: boolean;
+  publish: (destination: string, body: unknown) => void;
+  subscribe: (
+    destination: string,
+    listener: (payload: unknown) => void,
+  ) => () => void;
+}
+
+const Context = createContext<RealtimeValue | null>(null);
+
+export function RealtimeProvider({ children }: PropsWithChildren) {
+  const { isAuthenticated } = useAuth();
+  const cache = useQueryClient();
+  const { data: settings = defaultSettings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: getSettings,
+    initialData: defaultSettings,
+    enabled: isAuthenticated,
+  });
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const client = useRef<Client | null>(null);
+  const listeners = useRef(new Map<string, Set<(payload: unknown) => void>>());
+  const [connected, setConnected] = useState(false);
+  const subscribe = useCallback(
+    (destination: string, listener: (payload: unknown) => void) => {
+      const entries = listeners.current.get(destination) ?? new Set();
+      entries.add(listener);
+      listeners.current.set(destination, entries);
+      return () => {
+        entries.delete(listener);
+        if (!entries.size) listeners.current.delete(destination);
+      };
+    },
+    [],
+  );
+  const publish = useCallback((destination: string, body: unknown) => {
+    if (!client.current?.connected)
+      throw new Error("Realtime connection is unavailable");
+    client.current.publish({ destination, body: JSON.stringify(body) });
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const base = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    const socketUrl = new URL("/ws", base).toString();
+    const stomp = new Client({
+      webSocketFactory: () => new SockJS(socketUrl),
+      connectHeaders: { Authorization: `Bearer ${getAccessToken() ?? ""}` },
+      reconnectDelay: 2500,
+      heartbeatIncoming: 10_000,
+      heartbeatOutgoing: 10_000,
+      onConnect: () => {
+        setConnected(true);
+        for (const destination of [
+          "/user/queue/presence",
+          "/user/queue/challenges",
+          "/user/queue/notifications",
+          "/user/queue/errors",
+        ]) {
+          stomp.subscribe(destination, (message: IMessage) => {
+            try {
+              const raw: unknown = JSON.parse(message.body);
+              const payload = destination.endsWith("/challenges")
+                ? challengeEventSchema.parse(raw)
+                : destination.endsWith("/presence")
+                  ? presenceEventSchema.parse(raw)
+                  : destination.endsWith("/notifications")
+                    ? userNotificationSchema.parse(raw)
+                    : raw;
+              listeners.current
+                .get(destination)
+                ?.forEach((listener) => listener(payload));
+              if (destination.endsWith("/presence")) {
+                const presence = presenceEventSchema.parse(payload);
+                cache.setQueryData<
+                  Array<{ publicUserId: string; presence: string }>
+                >(["friends"], (friends) =>
+                  friends?.map((friend) =>
+                    friend.publicUserId === presence.publicUserId
+                      ? { ...friend, presence: presence.status }
+                      : friend,
+                  ),
+                );
+              }
+              if (destination.endsWith("/errors")) {
+                const error = payload as BackendError;
+                notifications.show({
+                  title: error.errorCode,
+                  message: error.message,
+                  color: "red",
+                });
+              }
+              if (destination.endsWith("/challenges")) {
+                const challenge = challengeEventSchema.parse(payload);
+                if (
+                  challenge.eventType === "INVITATION_RECEIVED" &&
+                  settingsRef.current.inAppNotificationsEnabled
+                ) {
+                  notifications.show({
+                    title: "New game challenge",
+                    message: `${challenge.otherDisplayName ?? challenge.otherUsername ?? "A friend"} invited you to play.`,
+                    color: "green",
+                  });
+                  if (settingsRef.current.notificationSoundsEnabled)
+                    playUiTone(740);
+                }
+              }
+              if (destination.endsWith("/notifications")) {
+                const notice = userNotificationSchema.parse(payload);
+                const messages = {
+                  FRIEND_REQUEST: [
+                    "Friend request",
+                    "Someone sent you a friend request.",
+                  ],
+                  FRIEND_REQUEST_ACCEPTED: [
+                    "Friend request accepted",
+                    "You can now challenge each other.",
+                  ],
+                  FRIEND_REQUEST_DECLINED: [
+                    "Friend request declined",
+                    "Your friend request was declined.",
+                  ],
+                  GAME_SAVED: [
+                    "Game saved",
+                    "Your completed game is available in your history.",
+                  ],
+                } as const;
+                const [title, messageText] = messages[notice.type];
+                if (settingsRef.current.inAppNotificationsEnabled) {
+                  notifications.show({
+                    title,
+                    message: messageText,
+                    color: "green",
+                  });
+                  if (settingsRef.current.notificationSoundsEnabled)
+                    playUiTone(740);
+                }
+                void cache.invalidateQueries({ queryKey: ["friends"] });
+                void cache.invalidateQueries({ queryKey: ["friend-requests"] });
+                void cache.invalidateQueries({ queryKey: ["my-history"] });
+              }
+            } catch {
+              notifications.show({
+                title: "Connection message error",
+                message: "Received an unreadable server event.",
+                color: "red",
+              });
+            }
+          });
+        }
+      },
+      onDisconnect: () => {
+        setConnected(false);
+      },
+      onWebSocketClose: () => {
+        setConnected(false);
+      },
+    });
+    client.current = stomp;
+    stomp.activate();
+    return () => {
+      setConnected(false);
+      client.current = null;
+      void stomp.deactivate();
+    };
+  }, [isAuthenticated, cache]);
+
+  const value = useMemo(
+    () => ({ connected, publish, subscribe }),
+    [connected, publish, subscribe],
+  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
+
+export function useRealtime(): RealtimeValue {
+  const value = useContext(Context);
+  if (!value)
+    throw new Error("useRealtime must be used within RealtimeProvider");
+  return value;
+}

@@ -1,0 +1,78 @@
+.landing-page {
+  min-height: 100vh;
+  padding: 0 clamp(1.2rem, 5vw, 5rem);
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse at 78% 54%, #222a1f, #121411 58%);
+}
+.landing-page > header {
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.landing-hero {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 0.85fr);
+  align-items: center;
+  gap: clamp(2rem, 9vw, 9rem);
+  max-width: 1160px;
+  width: 100%;
+  margin: auto;
+  padding: 4rem 0;
+}
+.hero-copy h1 {
+  font-size: clamp(3.2rem, 7vw, 6.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.075em;
+  margin: 1rem 0 1.3rem;
+  font-weight: 650;
+}
+.eyebrow {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.13em;
+  font-weight: 700;
+}
+.hero-board {
+  aspect-ratio: 1;
+  width: min(100%, 470px);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  overflow: hidden;
+  border-radius: 9px;
+  box-shadow: 0 35px 90px #0008;
+  transform: rotate(1.4deg);
+}
+.hero-board > div {
+  display: grid;
+  place-items: center;
+  font-size: clamp(1.2rem, 4.5vw, 3rem);
+  color: #182019;
+}
+.hero-board .light-square {
+  background: #c7d5bb;
+}
+.hero-board .dark-square {
+  background: #6c8763;
+  color: #edf1e7;
+}
+.landing-page footer {
+  padding: 1.5rem 0;
+  border-top: 1px solid #ffffff12;
+}
+@media (max-width: 760px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    padding: 3rem 0;
+    gap: 3rem;
+  }
+  .hero-board {
+    width: min(88vw, 420px);
+    margin-inline: auto;
+  }
+}

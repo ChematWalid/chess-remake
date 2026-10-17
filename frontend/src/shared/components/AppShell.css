@@ -1,0 +1,39 @@
+.app-header {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.side-nav {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.brand {
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 1.25rem;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  text-decoration: none;
+}
+.brand svg {
+  color: var(--accent);
+}
+.app-main {
+  min-height: 100vh;
+}
+.app-main > div {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+}
+.mantine-NavLink-root {
+  border-radius: 8px;
+  color: var(--muted);
+}
+.mantine-NavLink-root[data-active] {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.mantine-NavLink-root:hover {
+  background: var(--hover);
+}
