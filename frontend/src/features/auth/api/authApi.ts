@@ -1,4 +1,4 @@
-import { apiPost } from "../../../shared/api/client";
+import { apiPost, refreshAuthSession } from "../../../shared/api/client";
 import {
   authResponseSchema,
   type AuthResponse,
@@ -45,19 +45,8 @@ export async function exchangeOAuthCode(code: string): Promise<AuthResponse> {
 export async function logout(): Promise<void> {
   return apiPost("/api/auth/logout");
 }
-let sessionRestore: Promise<AuthResponse> | null = null;
 export function restoreSession(): Promise<AuthResponse> {
-  if (!sessionRestore) {
-    sessionRestore = apiPost(
-      "/api/auth/refresh",
-      undefined,
-      undefined,
-      authResponseSchema,
-    ).finally(() => {
-      sessionRestore = null;
-    });
-  }
-  return sessionRestore;
+  return refreshAuthSession();
 }
 export async function completeOAuthOnboarding(
   username: string,

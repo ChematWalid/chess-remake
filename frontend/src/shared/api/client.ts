@@ -1,6 +1,11 @@
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import { z } from "zod";
-import type { AppResponse, BackendError } from "./types";
+import {
+  authResponseSchema,
+  type AppResponse,
+  type AuthResponse,
+  type BackendError,
+} from "./types";
 
 const envelopeSchema = z.object({
   success: z.boolean(),
@@ -20,7 +25,7 @@ export const apiClient = axios.create({
 });
 
 let accessToken: string | null = null;
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<AuthResponse> | null = null;
 let onSessionExpired: (() => void) | null = null;
 
 export function setAccessToken(token: string | null): void {
@@ -68,18 +73,12 @@ apiClient.interceptors.response.use(
       !config.url?.includes("/api/auth/")
     ) {
       config._retried = true;
-      refreshPromise ??= refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-      const refreshed = await refreshPromise;
-      if (refreshed) {
-        config.headers = {
-          ...config.headers,
-          Authorization: `Bearer ${refreshed}`,
-        };
-        return apiClient(config);
-      }
-      onSessionExpired?.();
+      const refreshed = await refreshAuthSession();
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${refreshed.accessToken}`,
+      };
+      return apiClient(config);
     }
     const body = error.response?.data as Partial<BackendError> | undefined;
     throw new ApiError(
@@ -90,32 +89,54 @@ apiClient.interceptors.response.use(
   },
 );
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshAuthSessionRequest(): Promise<AuthResponse> {
   try {
-    const response = await axios.post<AppResponse<{ accessToken: string }>>(
+    const response = await axios.post<AppResponse<unknown>>(
       `${baseURL}/api/auth/refresh`,
       {},
       { withCredentials: true },
     );
-    const parsed = envelopeSchema.parse(response.data) as AppResponse<{
-      accessToken: string;
-    }>;
-    if (!parsed.success || !parsed.data) return null;
-    setAccessToken(parsed.data.accessToken);
-    return parsed.data.accessToken;
-  } catch {
-    return null;
+    const parsed = envelopeSchema.parse(response.data) as AppResponse<unknown>;
+    if (!parsed.success || parsed.data == null) {
+      throw new ApiError(
+        parsed.errorCode ?? "REFRESH_FAILED",
+        parsed.message,
+        parsed.code ?? 401,
+      );
+    }
+    const auth = authResponseSchema.parse(parsed.data);
+    setAccessToken(auth.accessToken);
+    return auth;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 401) onSessionExpired?.();
+      throw error;
+    }
+    if (axios.isAxiosError(error)) {
+      const body = error.response?.data as Partial<BackendError> | undefined;
+      const refreshError = new ApiError(
+        body?.errorCode ?? "NETWORK_ERROR",
+        body?.message ?? error.message,
+        error.response?.status ?? 0,
+      );
+      if (refreshError.status === 401) onSessionExpired?.();
+      throw refreshError;
+    }
+    throw error;
   }
 }
 
-export function refreshSessionAccessToken(): Promise<string | null> {
-  refreshPromise ??= refreshAccessToken().finally(() => {
+export function refreshAuthSession(): Promise<AuthResponse> {
+  refreshPromise ??= refreshAuthSessionRequest().finally(() => {
     refreshPromise = null;
   });
-  return refreshPromise.then((token) => {
-    if (!token && !accessToken) onSessionExpired?.();
-    return token;
-  });
+  return refreshPromise;
+}
+
+export function refreshSessionAccessToken(): Promise<string | null> {
+  return refreshAuthSession()
+    .then((auth) => auth.accessToken)
+    .catch(() => null);
 }
 
 export class ApiError extends Error {

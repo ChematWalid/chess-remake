@@ -67,7 +67,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       })
       .catch(() => {
         setAccessToken(null);
-        setUser(null);
       })
       .finally(() => setIsLoading(false));
   }, []);
