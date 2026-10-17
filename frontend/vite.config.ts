@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
   const backend = env.VITE_API_BASE_URL || "http://localhost:8080";
   return {
     plugins: [react()],
+    define: {
+      global: "globalThis",
+    },
     server: {
       proxy: {
         "/api": backend,
