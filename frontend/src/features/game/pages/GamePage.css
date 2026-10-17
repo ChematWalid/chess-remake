@@ -1,5 +1,5 @@
 .game-page {
-  --board-max: 680px;
+  --board-max: min(680px, calc(100dvh - 390px));
 }
 .game-layout {
   display: grid;
@@ -71,6 +71,6 @@
     max-height: none;
   }
   .board-column {
-    max-width: min(100%, 680px);
+    max-width: min(100%, 680px, calc(100dvh - 250px));
   }
 }
