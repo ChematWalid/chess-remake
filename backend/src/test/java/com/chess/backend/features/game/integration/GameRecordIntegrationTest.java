@@ -22,6 +22,7 @@ import com.chess.backend.features.game.repository.GameHistoryRepository;
 import com.chess.backend.features.game.dto.GameStartRequest;
 import com.chess.backend.features.user.domain.User;
 import com.chess.backend.features.user.repository.UserRepository;
+import com.chess.backend.features.user.repository.UserDraftRepository;
 import com.chess.backend.features.user.service.ProfileService;
 import com.chess.backend.features.user.service.UserDirectory;
 import com.chess.backend.features.user.storage.FileStorage;
@@ -33,10 +34,12 @@ import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -97,6 +100,9 @@ class GameRecordIntegrationTest {
     private UserRepository users;
 
     @Autowired
+    private UserDraftRepository userDrafts;
+
+    @Autowired
     private GameChallengeRepository challenges;
 
     @Autowired
@@ -132,6 +138,7 @@ class GameRecordIntegrationTest {
 
     @BeforeEach
     void clearDatabase() {
+        userDrafts.deleteAll();
         histories.deleteAll();
         challenges.deleteAll();
         users.deleteAll();
@@ -538,6 +545,72 @@ class GameRecordIntegrationTest {
                 .andExpect(jsonPath("$.data.boardPalette").value("WALNUT"))
                 .andExpect(jsonPath("$.data.themePreference").value("LIGHT"))
                 .andExpect(jsonPath("$.data.notificationSoundsEnabled").value(true));
+    }
+
+    @Test
+    void draftApiReturnsPersistedTimestampsAndKeepsTheNewestEdit() throws Exception {
+        User user = userDirectory.create(new User("draft-player", "draft-player@example.test", null, "Draft Player"));
+        String token = jwtService.createAccessToken(user.getId(), user.getUsername(), UserRole.ROLE_USER);
+        Instant earlierEdit = Instant.parse("2026-10-17T12:00:00Z");
+        Instant laterEdit = earlierEdit.plusSeconds(60);
+
+        var firstResponse = mockMvc.perform(put("/api/users/me/drafts/position-setup")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "payload", java.util.Map.of("value", "older"), "editedAt", earlierEdit))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Instant firstUpdatedAt = objectMapper.readTree(firstResponse.getResponse().getContentAsString())
+                .at("/data/updatedAt").traverse(objectMapper).readValueAs(Instant.class);
+
+        var secondResponse = mockMvc.perform(put("/api/users/me/drafts/position-setup")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "payload", java.util.Map.of("value", "newer"), "editedAt", laterEdit))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.payload.value").value("newer"))
+                .andReturn();
+        Instant secondUpdatedAt = objectMapper.readTree(secondResponse.getResponse().getContentAsString())
+                .at("/data/updatedAt").traverse(objectMapper).readValueAs(Instant.class);
+        assertThat(secondUpdatedAt).isAfter(firstUpdatedAt);
+
+        mockMvc.perform(put("/api/users/me/drafts/position-setup")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "payload", java.util.Map.of("value", "offline-old"), "editedAt", earlierEdit))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.payload.value").value("newer"))
+                .andExpect(jsonPath("$.data.editedAt").value(laterEdit.toString()));
+
+        mockMvc.perform(put("/api/users/me/drafts/position-setup")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payload\":null}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void draftApiEnforcesThePerAccountLimit() throws Exception {
+        User user = userDirectory.create(new User("draft-limit", "draft-limit@example.test", null, "Draft Limit"));
+        String token = jwtService.createAccessToken(user.getId(), user.getUsername(), UserRole.ROLE_USER);
+
+        for (int index = 0; index < 20; index++) {
+            mockMvc.perform(put("/api/users/me/drafts/feature-" + index)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"payload\":{\"value\":1}}"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(put("/api/users/me/drafts/feature-overflow")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payload\":{\"value\":1}}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("USER_DRAFT_LIMIT_EXCEEDED"));
     }
 
     private String payload(GameChallenge challenge, String roomCode, String legacyRoomToken, boolean isDraw,

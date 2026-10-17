@@ -37,12 +37,16 @@ public class UserDraft {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "edited_at", nullable = false)
+    private Instant editedAt;
+
     protected UserDraft() { }
 
-    public UserDraft(User user, String featureKey, JsonNode payload) {
+    public UserDraft(User user, String featureKey, JsonNode payload, Instant editedAt) {
         this.user = user;
         this.featureKey = featureKey;
         this.payload = payload;
+        this.editedAt = editedAt;
     }
 
     public Long getId() { return id; }
@@ -50,8 +54,10 @@ public class UserDraft {
     public String getFeatureKey() { return featureKey; }
     public JsonNode getPayload() { return payload; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getEditedAt() { return editedAt; }
 
-    public void update(JsonNode value) {
+    public void update(JsonNode value, Instant editedAt) {
         payload = value;
+        this.editedAt = editedAt;
     }
 }
