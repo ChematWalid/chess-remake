@@ -27,4 +27,4 @@ set_value APP_S3_SECRET_KEY "$(openssl rand -hex 32)"
 chmod 600 "$environment_file"
 
 printf 'Created .env.deploy with generated secrets and mode 0600.\n'
-printf 'Edit APP_DOMAIN, ACME_EMAIL, SMTP settings, and Google OAuth credentials before deployment.\n'
+printf 'Edit APP_DOMAIN, NGROK_AUTHTOKEN, SMTP settings, and Google OAuth credentials before deployment.\n'

@@ -13,4 +13,4 @@ docker compose --env-file .env.dev -f compose.dev.yaml up --build
 
 ## Deploy
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the self-hosted home PC setup, required external credentials, deployment commands, and backups. Deployment and development use separate Compose files and ignored environment files so local data and settings remain separate.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the self-hosted home PC setup through ngrok, required external credentials, deployment commands, and backups. Deployment and development use separate Compose files and ignored environment files so local data and settings remain separate.

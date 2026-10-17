@@ -1,8 +1,10 @@
 {
-	email {$ACME_EMAIL}
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
-{$APP_DOMAIN} {
+http://{$APP_DOMAIN} {
 	encode zstd gzip
 
 	header {

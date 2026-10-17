@@ -27,13 +27,18 @@ require_configured() {
 }
 
 for key in \
-    APP_DOMAIN ACME_EMAIL DB_NAME DB_USERNAME DB_PASSWORD \
+    APP_DOMAIN NGROK_AUTHTOKEN DB_NAME DB_USERNAME DB_PASSWORD \
     APP_JWT_SECRET APP_ENGINE_JWT_SECRET APP_INTERNAL_TOKEN \
     APP_S3_ENDPOINT APP_S3_REGION APP_S3_BUCKET APP_S3_ACCESS_KEY APP_S3_SECRET_KEY \
     SMTP_HOST SMTP_USERNAME SMTP_PASSWORD APP_EMAIL_FROM GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
 do
     require_configured "$key"
 done
+
+if [[ "$(get_value APP_DOMAIN)" == *"://"* ]]; then
+    printf 'APP_DOMAIN must be a hostname only, without a URL scheme.\n' >&2
+    exit 1
+fi
 
 if [[ "$(get_value APP_S3_ENDPOINT)" != "http://minio:9000" ]]; then
     printf 'APP_S3_ENDPOINT must be http://minio:9000 for the self-hosted deployment.\n' >&2

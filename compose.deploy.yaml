@@ -3,19 +3,21 @@ services:
     image: caddy:2.10-alpine
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}
-      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.deploy}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
     depends_on:
       - frontend
       - backend
       - chess-server
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: ["http", "--url", "https://${APP_DOMAIN:?Set APP_DOMAIN in .env.deploy}", "edge:80"]
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:?Set NGROK_AUTHTOKEN in .env.deploy}
+    depends_on:
+      - edge
     restart: unless-stopped
 
   frontend:
@@ -137,8 +139,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  caddy-config:
-  caddy-data:
   chess-outbox:
   deploy-minio:
   deploy-postgres:
