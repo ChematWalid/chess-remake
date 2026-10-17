@@ -813,6 +813,96 @@ test("queues a pawn recapture onto an occupied friendly square", async ({
   await expect.poll(() => playedMoves).toEqual(["d4e5"]);
 });
 
+test("shows a stalemate draw from the live game result event", async ({
+  page,
+}) => {
+  await installAuthenticatedSession(page);
+  await page.route("**/api/users/me/settings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(preferences),
+    }),
+  );
+  await page.route("**/api/users/turn_rival/profile", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        ...profile,
+        username: "turn_rival",
+        displayName: "Rival",
+      }),
+    }),
+  );
+  await page.route("**/api/challenges/54", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope({
+        challengeId: 54,
+        status: "ACCEPTED",
+        opponentPublicUserId: "223e4567-e89b-42d3-a456-426614174000",
+        opponentUsername: "turn_rival",
+        initialTimeSeconds: null,
+        incrementSeconds: null,
+        challengerSide: "WHITE",
+        playerColor: "WHITE",
+        roomCode: "ROOM54",
+        initialFen: "7k/5Q2/8/6K1/8/8/8/8 w - - 0 1",
+        setupMoves: [],
+        setupFens: [],
+        connectUrl: "ws://engine.test/stalemate",
+        token: "test-token",
+        expiresAt: "2030-01-01T00:00:00Z",
+      }),
+    }),
+  );
+
+  let socket: WebSocketRoute | undefined;
+  await page.routeWebSocket("ws://engine.test/stalemate", (route) => {
+    socket = route;
+    route.onMessage((message) => {
+      const request = JSON.parse(String(message)) as { action?: string };
+      if (request.action !== "connect_token") return;
+      route.send(
+        JSON.stringify({
+          event: "room_joined",
+          room_code: "ROOM54",
+          role: "white",
+        }),
+      );
+      route.send(
+        JSON.stringify({
+          event: "game_started",
+          room_code: "ROOM54",
+          fen: "7k/5Q2/8/6K1/8/8/8/8 w - - 0 1",
+          time_control: "unlimited",
+          white_time_ms: -1,
+          black_time_ms: -1,
+          moves: [],
+          setup_moves: [],
+          setup_fens: [],
+        }),
+      );
+    });
+  });
+
+  await page.goto(`${appUrl}/game/54`);
+  await expect(page.getByText("Connected to the game server")).toBeVisible();
+  socket?.send(
+    JSON.stringify({
+      event: "game_over",
+      result: "Draw",
+      winner: null,
+      reason: "Stalemate",
+      reason_code: "STALEMATE",
+    }),
+  );
+  await expect(page.getByRole("dialog")).toContainText("Game drawn");
+  await expect(page.getByRole("dialog")).toContainText("Draw by Stalemate.");
+});
+
 async function installAuthenticatedSession(page: Page) {
   await page.route("**/api/auth/refresh", (route) =>
     route.fulfill({
