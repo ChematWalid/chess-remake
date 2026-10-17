@@ -249,6 +249,164 @@ test("profile data is shown from the browser cache after a reload", async ({
   await expect.poll(() => profileRequests).toBe(1);
 });
 
+test("draft restoration does not overwrite edits made during an IndexedDB read", async ({
+  page,
+}) => {
+  await delayDraftLocalRead(page);
+  await installApi(page);
+  let savedValue: string | undefined;
+  await page.route("**/api/users/me/drafts**", async (route) => {
+    if (route.request().method() === "PUT") {
+      savedValue = route.request().postDataJSON().payload.value;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: envelope({
+          featureKey: "player-search",
+          payload: { value: savedValue },
+          updatedAt: new Date().toISOString(),
+          editedAt: route.request().postDataJSON().editedAt,
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope([]),
+    });
+  });
+
+  await page.goto(`${appUrl}/search`);
+  const search = page.getByRole("textbox", { name: "Search players" });
+  await search.fill("new input");
+  await expect(search).toHaveValue("new input");
+  await page.waitForTimeout(3_200);
+
+  await expect(search).toHaveValue("new input");
+  await expect.poll(() => savedValue).toBe("new input");
+});
+
+test("offline draft sync adopts a newer server version", async ({ page }) => {
+  await installApi(page);
+  const oldEdit = new Date(Date.now() - 60_000).toISOString();
+  let serverDraft = {
+    featureKey: "player-search",
+    payload: { value: "starting value" },
+    updatedAt: oldEdit,
+    editedAt: oldEdit,
+  };
+  let submittedEditAt: string | undefined;
+  await page.route("**/api/users/me/drafts**", async (route) => {
+    if (route.request().method() === "PUT") {
+      submittedEditAt = route.request().postDataJSON().editedAt;
+      serverDraft = {
+        featureKey: "player-search",
+        payload: { value: "newer edit from another device" },
+        updatedAt: new Date().toISOString(),
+        editedAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: envelope(serverDraft),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope([serverDraft]),
+    });
+  });
+
+  await page.goto(`${appUrl}/search`);
+  const search = page.getByRole("textbox", { name: "Search players" });
+  await expect(search).toHaveValue("starting value");
+  await page.context().setOffline(true);
+  await search.fill("offline edit");
+  await expect(
+    page.getByText("Saved in this browser. Sync will retry when online."),
+  ).toBeVisible();
+
+  await page.context().setOffline(false);
+
+  await expect(search).toHaveValue("newer edit from another device");
+  expect(submittedEditAt).toBeDefined();
+});
+
+test("clearing a draft reports pending removal while offline", async ({ page }) => {
+  await installApi(page);
+  let savedDraft: {
+    featureKey: string;
+    payload: { value: string };
+    updatedAt: string;
+    editedAt: string;
+  } | null = {
+    featureKey: "player-search",
+    payload: { value: "saved search" },
+    updatedAt: new Date().toISOString(),
+    editedAt: new Date().toISOString(),
+  };
+  await page.route("**/api/users/me/drafts**", async (route) => {
+    if (route.request().method() === "DELETE") {
+      savedDraft = null;
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: envelope(savedDraft ? [savedDraft] : []),
+    });
+  });
+
+  await page.goto(`${appUrl}/search`);
+  await expect(page.getByRole("textbox", { name: "Search players" })).toHaveValue(
+    "saved search",
+  );
+  await page.context().setOffline(true);
+  await page.getByRole("button", { name: "Clear saved draft" }).click();
+  await expect(
+    page.getByText("Draft removal is saved here and will sync when online."),
+  ).toBeVisible();
+
+  await page.context().setOffline(false);
+  await expect(page.getByText("Saved draft cleared.")).toBeVisible();
+  expect(savedDraft).toBeNull();
+});
+
+async function delayDraftLocalRead(page: Page) {
+  await page.addInitScript(() => {
+    const delayedRequests = new WeakSet<IDBRequest>();
+    const originalGet = IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get = function (key: IDBValidKey) {
+      const request = originalGet.call(this, key);
+      if (String(key).startsWith("draft-local:")) delayedRequests.add(request);
+      return request;
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(
+      IDBRequest.prototype,
+      "onsuccess",
+    );
+    if (!descriptor?.get || !descriptor.set) return;
+    Object.defineProperty(IDBRequest.prototype, "onsuccess", {
+      configurable: true,
+      enumerable: descriptor.enumerable,
+      get: descriptor.get,
+      set(handler: ((this: IDBRequest, event: Event) => unknown) | null) {
+        const delayedHandler =
+          handler && delayedRequests.has(this)
+            ? function (this: IDBRequest, event: Event) {
+                window.setTimeout(() => handler.call(this, event), 3_000);
+              }
+            : handler;
+        descriptor.set?.call(this, delayedHandler);
+      },
+    });
+  });
+}
+
 async function installApi(page: Page, onProfileRequest?: () => void) {
   await page.route("**/api/auth/refresh", (route) =>
     route.fulfill({

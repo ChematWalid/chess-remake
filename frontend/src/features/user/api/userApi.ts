@@ -66,10 +66,11 @@ export async function getMyDrafts(): Promise<UserDraft[]> {
 export async function saveMyDraft(
   featureKey: string,
   payload: unknown,
+  editedAt: string,
 ): Promise<UserDraft> {
   return apiPut(
     `/api/users/me/drafts/${encodeURIComponent(featureKey)}`,
-    { payload },
+    { payload, editedAt },
     userDraftSchema,
   );
 }

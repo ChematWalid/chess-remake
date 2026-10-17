@@ -58,6 +58,7 @@ export const userDraftSchema = z.object({
   featureKey: z.string(),
   payload: z.unknown(),
   updatedAt: z.string(),
+  editedAt: z.string().optional(),
 });
 export type UserDraft = z.infer<typeof userDraftSchema>;
 export const searchResultSchema = z.object({
