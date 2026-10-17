@@ -8,7 +8,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import {
-  IconChessKnight,
+  IconChessRook,
   IconFriends,
   IconHistory,
   IconHome2,
@@ -106,7 +106,7 @@ export function AppShell() {
               aria-label="Toggle navigation"
             />
             <Link to="/" className="brand">
-              <IconChessKnight size={27} stroke={1.6} />
+              <IconChessRook size={27} stroke={1.6} />
               <span>rook</span>
             </Link>
           </Group>

@@ -1,7 +1,7 @@
 import { Button, Group, Text } from "@mantine/core";
 import {
   IconArrowUpRight,
-  IconChessKnight,
+  IconChessRook,
   IconDeviceGamepad2,
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
@@ -15,7 +15,7 @@ export function LandingPage() {
     <main className="landing-page">
       <header>
         <Link to="/" className="brand">
-          <IconChessKnight size={28} />
+          <IconChessRook size={28} />
           <span>rook</span>
         </Link>
         <Group>
@@ -25,7 +25,12 @@ export function LandingPage() {
             </Button>
           ) : (
             <>
-              <Button component={Link} to="/login" variant="subtle" color="gray">
+              <Button
+                component={Link}
+                to="/login"
+                variant="subtle"
+                color="gray"
+              >
                 Sign in
               </Button>
               <Button component={Link} to="/register">

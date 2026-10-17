@@ -11,10 +11,12 @@ import {
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { notifications } from "@mantine/notifications";
 import { AvatarEditor } from "../components/AvatarEditor";
 import { useAuth } from "../../../shared/auth/AuthProvider";
+import { DraftStatus } from "../../../shared/drafts/DraftStatus";
+import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
 import { ErrorState, LoadingState } from "../../../shared/components/PageState";
 import {
   getMyProfile,
@@ -39,6 +41,12 @@ export function ProfilePage() {
     queryFn: () => (isOwner ? getMyProfile() : getProfile(username ?? "")),
   });
   const data = profile.data;
+  const profileDraft = useSyncedDraft(
+    "profile-edit",
+    { username: "", displayName: "", bio: "", searchable: true },
+    { enabled: isOwner },
+  );
+  const hydratingForm = useRef(true);
   const friends = useQuery({
     queryKey: ["friends"],
     queryFn: getFriends,
@@ -46,21 +54,41 @@ export function ProfilePage() {
   });
   const form = useForm({
     initialValues: { username: "", displayName: "", bio: "", searchable: true },
+    onValuesChange: (values) => {
+      if (!hydratingForm.current && isOwner) profileDraft.update(values);
+    },
   });
   useEffect(() => {
-    if (profile.data)
+    if (profile.data && (!isOwner || profileDraft.isReady)) {
+      hydratingForm.current = true;
       form.setValues({
-        username: profile.data.username,
-        displayName: profile.data.displayName,
-        bio: profile.data.bio ?? "",
-        searchable: profile.data.searchable ?? true,
+        username: profileDraft.hasDraft
+          ? profileDraft.value.username
+          : profile.data.username,
+        displayName: profileDraft.hasDraft
+          ? profileDraft.value.displayName
+          : profile.data.displayName,
+        bio: profileDraft.hasDraft
+          ? profileDraft.value.bio
+          : (profile.data.bio ?? ""),
+        searchable: profileDraft.hasDraft
+          ? profileDraft.value.searchable
+          : (profile.data.searchable ?? true),
       });
-  }, [profile.data]);
+      hydratingForm.current = false;
+    }
+  }, [
+    profile.data,
+    profileDraft.hasDraft,
+    profileDraft.isReady,
+    profileDraft.restoreVersion,
+  ]);
   const cache = useQueryClient();
   const update = useMutation({
     mutationFn: updateMyProfile,
     onSuccess: (result) => {
       cache.setQueryData(queryKey, result);
+      profileDraft.clear();
       notifications.show({
         title: "Profile saved",
         message: "Your profile changes are up to date.",
@@ -134,7 +162,7 @@ export function ProfilePage() {
   });
 
   if (profile.isLoading) return <LoadingState label="Loading profile" />;
-  if (profile.isError || !profile.data)
+  if (!profile.data)
     return (
       <ErrorState
         message={profile.error?.message ?? "Profile not found"}
@@ -233,6 +261,23 @@ export function ProfilePage() {
             <Text fw={700} size="lg" mb="md">
               Edit profile
             </Text>
+            <DraftStatus
+              status={profileDraft.status}
+              hasDraft={profileDraft.hasDraft}
+              onClear={() => {
+                profileDraft.clear();
+                if (profile.data) {
+                  hydratingForm.current = true;
+                  form.setValues({
+                    username: profile.data.username,
+                    displayName: profile.data.displayName,
+                    bio: profile.data.bio ?? "",
+                    searchable: profile.data.searchable ?? true,
+                  });
+                  hydratingForm.current = false;
+                }
+              }}
+            />
             <form onSubmit={form.onSubmit((values) => update.mutate(values))}>
               <Stack>
                 <TextInput

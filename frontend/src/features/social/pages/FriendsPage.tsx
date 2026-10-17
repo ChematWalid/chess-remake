@@ -110,7 +110,7 @@ export function FriendsPage() {
         <Tabs.Panel value="friends" pt="lg">
           {friends.isLoading ? (
             <LoadingState />
-          ) : friends.isError ? (
+          ) : friends.isError && !friends.data ? (
             <ErrorState
               message={friends.error.message}
               onRetry={() => void friends.refetch()}
@@ -169,7 +169,7 @@ export function FriendsPage() {
         <Tabs.Panel value="incoming" pt="lg">
           {incoming.isLoading ? (
             <LoadingState />
-          ) : incoming.isError ? (
+          ) : incoming.isError && !incoming.data ? (
             <ErrorState
               message={incoming.error.message}
               onRetry={() => void incoming.refetch()}
@@ -220,7 +220,7 @@ export function FriendsPage() {
         <Tabs.Panel value="outgoing" pt="lg">
           {outgoing.isLoading ? (
             <LoadingState />
-          ) : outgoing.isError ? (
+          ) : outgoing.isError && !outgoing.data ? (
             <ErrorState
               message={outgoing.error.message}
               onRetry={() => void outgoing.refetch()}
@@ -253,7 +253,7 @@ export function FriendsPage() {
         <Tabs.Panel value="blocked" pt="lg">
           {blocked.isLoading ? (
             <LoadingState />
-          ) : blocked.isError ? (
+          ) : blocked.isError && !blocked.data ? (
             <ErrorState
               message={blocked.error.message}
               onRetry={() => void blocked.refetch()}

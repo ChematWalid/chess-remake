@@ -30,6 +30,7 @@ import { useRealtime } from "../../realtime/RealtimeContext";
 import { ChallengePositionPicker } from "../components/ChallengePositionPicker";
 import { ChallengePositionPreview } from "../components/ChallengePositionPreview";
 import type { ChallengePosition } from "../../position/utils/positionUtils";
+import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
 
 const timeOptions = [
   { value: "unlimited", label: "Untimed" },
@@ -46,8 +47,19 @@ export function PlayPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const seededPosition = (
-    location.state as { challengePosition?: ChallengePosition } | null
+    location.state as {
+      challengePosition?: ChallengePosition;
+      positionSetupDraft?: boolean;
+    } | null
   )?.challengePosition;
+  const fromPositionSetup = Boolean(
+    (location.state as { positionSetupDraft?: boolean } | null)
+      ?.positionSetupDraft,
+  );
+  const positionDraft = useSyncedDraft<unknown>("position-setup", null, {
+    enabled: fromPositionSetup,
+    restoreExisting: false,
+  });
   const [challengeMode, setChallengeMode] = useState<"STANDARD" | "CUSTOM">(
     seededPosition ? "CUSTOM" : "STANDARD",
   );
@@ -149,6 +161,7 @@ export function PlayPage() {
     }
     try {
       sendGameChallenge(publish, request);
+      if (fromPositionSetup) positionDraft.clear();
       notifications.show({
         title: "Challenge sent",
         message: `Waiting for ${opponent} to respond.`,
@@ -207,7 +220,7 @@ export function PlayPage() {
           </Text>
           {friends.isLoading ? (
             <LoadingState label="Loading friends" />
-          ) : friends.isError ? (
+          ) : friends.isError && !friends.data ? (
             <ErrorState
               message={friends.error.message}
               onRetry={() => void friends.refetch()}
@@ -316,6 +329,11 @@ export function PlayPage() {
             </Group>
             {incoming.isLoading ? (
               <LoadingState />
+            ) : incoming.isError && !incoming.data ? (
+              <ErrorState
+                message={incoming.error.message}
+                onRetry={() => void incoming.refetch()}
+              />
             ) : incoming.data?.items.filter((item) => item.status === "PENDING")
                 .length ? (
               <Stack>
@@ -367,6 +385,11 @@ export function PlayPage() {
             </Text>
             {outgoing.isLoading ? (
               <LoadingState />
+            ) : outgoing.isError && !outgoing.data ? (
+              <ErrorState
+                message={outgoing.error.message}
+                onRetry={() => void outgoing.refetch()}
+              />
             ) : outgoing.data?.items.filter((item) => item.status === "PENDING")
                 .length ? (
               <Stack>

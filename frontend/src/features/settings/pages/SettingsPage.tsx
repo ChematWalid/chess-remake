@@ -17,10 +17,13 @@ import {
   updateSettings,
 } from "../../user/api/userApi";
 import { SettingToggle } from "../components/SettingToggle";
+import { DraftStatus } from "../../../shared/drafts/DraftStatus";
+import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
 import "./SettingsPage.css";
 
 export function SettingsPage() {
   const [draft, setDraft] = useState<UserSettings>(defaultSettings);
+  const settingsDraft = useSyncedDraft("settings-edit", defaultSettings);
   const [category, setCategory] = useState<string | null>("appearance");
   const cache = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: getSettings });
@@ -29,13 +32,20 @@ export function SettingsPage() {
     queryFn: getMyProfile,
   });
   useEffect(() => {
-    if (settings.data) setDraft(settings.data);
-  }, [settings.data]);
+    if (settings.data && settingsDraft.isReady)
+      setDraft(settingsDraft.hasDraft ? settingsDraft.value : settings.data);
+  }, [
+    settings.data,
+    settingsDraft.hasDraft,
+    settingsDraft.isReady,
+    settingsDraft.restoreVersion,
+  ]);
   const save = useMutation({
     mutationFn: updateSettings,
     onSuccess: (value) => {
       cache.setQueryData(["settings"], value);
       setDraft(value);
+      settingsDraft.clear();
       notifications.show({
         title: "Settings saved",
         message: "Your preferences sync with your account.",
@@ -67,7 +77,9 @@ export function SettingsPage() {
     },
   });
   function set<K extends keyof UserSettings>(key: K, value: UserSettings[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+    const next = { ...draft, [key]: value };
+    setDraft(next);
+    settingsDraft.update(next);
   }
   const hasUnsavedChanges =
     settings.data !== undefined &&
@@ -75,7 +87,10 @@ export function SettingsPage() {
 
   if (settings.isLoading || profile.isLoading)
     return <LoadingState label="Loading your preferences" />;
-  if (settings.isError || profile.isError)
+  if (
+    (settings.isError && !settings.data) ||
+    (profile.isError && !profile.data)
+  )
     return (
       <ErrorState
         message={
@@ -103,7 +118,11 @@ export function SettingsPage() {
           {hasUnsavedChanges && (
             <Button
               variant="default"
-              onClick={() => setDraft(settings.data ?? defaultSettings)}
+              onClick={() => {
+                const saved = settings.data ?? defaultSettings;
+                setDraft(saved);
+                settingsDraft.clear();
+              }}
             >
               Discard
             </Button>
@@ -117,6 +136,17 @@ export function SettingsPage() {
           </Button>
         </div>
       </header>
+      <div className="settings-page__draft-status">
+        <DraftStatus
+          status={settingsDraft.status}
+          hasDraft={settingsDraft.hasDraft}
+          onClear={() => {
+            const saved = settings.data ?? defaultSettings;
+            setDraft(saved);
+            settingsDraft.clear();
+          }}
+        />
+      </div>
       <Tabs
         value={category}
         onChange={setCategory}

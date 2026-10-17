@@ -54,6 +54,12 @@ export const profileSchema = z.object({
   draws: z.number().int(),
 });
 export type Profile = z.infer<typeof profileSchema>;
+export const userDraftSchema = z.object({
+  featureKey: z.string(),
+  payload: z.unknown(),
+  updatedAt: z.string(),
+});
+export type UserDraft = z.infer<typeof userDraftSchema>;
 export const searchResultSchema = z.object({
   publicId: z.string().uuid(),
   username: z.string(),

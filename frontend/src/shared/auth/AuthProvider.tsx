@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { setAccessToken, setSessionExpiredHandler } from "../api/client";
+import { deleteBrowserValuesWithPrefix } from "../storage/browserStorage";
 import type { AuthResponse, UserSummary } from "../api/types";
 import { logout, restoreSession } from "../../features/auth/api/authApi";
 
@@ -18,6 +19,13 @@ interface AuthContextValue {
   isLoading: boolean;
   signIn: (auth: AuthResponse) => void;
   signOut: () => Promise<void>;
+}
+
+function clearPrivateBrowserData(): void {
+  void Promise.all([
+    deleteBrowserValuesWithPrefix("query-cache:"),
+    deleteBrowserValuesWithPrefix("draft-local:"),
+  ]).catch(() => undefined);
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -43,6 +51,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setUser(null);
       sessionStorage.removeItem("chess.user");
       queryClient.clear();
+      clearPrivateBrowserData();
     }
   }, [queryClient]);
 
@@ -51,6 +60,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setAccessToken(null);
       setUser(null);
       sessionStorage.removeItem("chess.user");
+      queryClient.clear();
+      clearPrivateBrowserData();
     });
     const cached = sessionStorage.getItem("chess.user");
     if (cached) {

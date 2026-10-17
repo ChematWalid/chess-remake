@@ -10,9 +10,12 @@ import {
 import { SearchableProfile } from "../components/SearchableProfile";
 import { searchProfiles } from "../../user/api/userApi";
 import { getFriends, getOutgoingRequests } from "../../social/api/socialApi";
+import { DraftStatus } from "../../../shared/drafts/DraftStatus";
+import { useSyncedDraft } from "../../../shared/drafts/useSyncedDraft";
 
 export function SearchPage() {
-  const [value, setValue] = useState("");
+  const searchDraft = useSyncedDraft("player-search", { value: "" });
+  const value = searchDraft.value.value;
   const [query, setQuery] = useState("");
   const friends = useQuery({ queryKey: ["friends"], queryFn: getFriends });
   const outgoing = useQuery({
@@ -37,12 +40,19 @@ export function SearchPage() {
         </div>
       </header>
       <Stack gap="lg">
+        <DraftStatus
+          status={searchDraft.status}
+          hasDraft={searchDraft.hasDraft}
+          onClear={searchDraft.clear}
+        />
         <TextInput
           leftSection={<IconSearch size={18} />}
           size="md"
           placeholder="Try a username or name"
           value={value}
-          onChange={(event) => setValue(event.currentTarget.value)}
+          onChange={(event) =>
+            searchDraft.update({ value: event.currentTarget.value })
+          }
           aria-label="Search players"
         />
         {value.trim().length < 2 ? (
@@ -52,7 +62,7 @@ export function SearchPage() {
           />
         ) : results.isLoading ? (
           <LoadingState label="Searching players" />
-        ) : results.isError ? (
+        ) : results.isError && !results.data ? (
           <ErrorState
             message={results.error.message}
             onRetry={() => void results.refetch()}
@@ -76,8 +86,8 @@ export function SearchPage() {
                 relationshipLoading={
                   friends.isLoading ||
                   outgoing.isLoading ||
-                  friends.isError ||
-                  outgoing.isError
+                  (friends.isError && !friends.data) ||
+                  (outgoing.isError && !outgoing.data)
                 }
               />
             ))}

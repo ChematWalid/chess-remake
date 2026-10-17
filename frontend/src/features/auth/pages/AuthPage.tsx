@@ -13,7 +13,7 @@ import { zodResolver } from "mantine-form-zod-resolver";
 import { z } from "zod";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
-import { IconChessKnight } from "@tabler/icons-react";
+import { IconChessRook } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { ApiError } from "../../../shared/api/client";
 import type { AuthResponse } from "../../../shared/api/types";
@@ -114,7 +114,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   return (
     <main className="auth-page">
       <Link to="/" className="brand auth-brand">
-        <IconChessKnight size={28} />
+        <IconChessRook size={28} />
         <span>rook</span>
       </Link>
       <Paper className="auth-card" p="xl" radius="lg" withBorder>
