@@ -259,6 +259,18 @@ export function SettingsPage() {
                   checked={draft.gameSoundsEnabled}
                   onChange={(checked) => set("gameSoundsEnabled", checked)}
                 />
+                <SettingToggle
+                  label="Turn indicator"
+                  description="Highlight the player whose turn it is."
+                  checked={draft.turnIndicatorEnabled}
+                  onChange={(checked) => set("turnIndicatorEnabled", checked)}
+                />
+                <SettingToggle
+                  label="Turn sound"
+                  description="Play a sound when it becomes your turn."
+                  checked={draft.turnSoundEnabled}
+                  onChange={(checked) => set("turnSoundEnabled", checked)}
+                />
               </Stack>
             </Stack>
           </Tabs.Panel>

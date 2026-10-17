@@ -25,7 +25,8 @@ public class UserSettingsService {
                 .orElseThrow(() -> new UserSettingsNotFoundException("User settings were not found"));
         entity.update(request.boardPalette(), request.boardOrientation(), request.motionPreference(), request.themePreference(),
                 request.showCoordinates(), request.showLegalMoveHints(), request.premovesEnabled(),
-                request.moveConfirmation(), request.gameSoundsEnabled(), request.inAppNotificationsEnabled(),
+                request.moveConfirmation(), request.gameSoundsEnabled(), request.turnIndicatorEnabled(),
+                request.turnSoundEnabled(), request.inAppNotificationsEnabled(),
                 request.notificationSoundsEnabled());
         return view(entity);
     }
@@ -33,7 +34,8 @@ public class UserSettingsService {
     private UserSettingsView view(UserSettings entity) {
         return new UserSettingsView(entity.getBoardPalette(), entity.getBoardOrientation(), entity.getMotionPreference(), entity.getThemePreference(),
                 entity.isShowCoordinates(), entity.isShowLegalMoveHints(), entity.isPremovesEnabled(),
-                entity.isMoveConfirmation(), entity.isGameSoundsEnabled(), entity.isInAppNotificationsEnabled(),
+                entity.isMoveConfirmation(), entity.isGameSoundsEnabled(), entity.isTurnIndicatorEnabled(),
+                entity.isTurnSoundEnabled(), entity.isInAppNotificationsEnabled(),
                 entity.isNotificationSoundsEnabled());
     }
 }

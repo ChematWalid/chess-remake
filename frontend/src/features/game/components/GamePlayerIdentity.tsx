@@ -6,6 +6,8 @@ interface GamePlayerIdentityProps {
   username: string;
   avatarUrl: string | null;
   side: "White" | "Black";
+  isActive?: boolean;
+  showTurnIndicator?: boolean;
 }
 
 export function GamePlayerIdentity({
@@ -13,9 +15,16 @@ export function GamePlayerIdentity({
   username,
   avatarUrl,
   side,
+  isActive = false,
+  showTurnIndicator = false,
 }: GamePlayerIdentityProps) {
   return (
-    <Group className="game-player-identity" gap="sm" wrap="nowrap">
+    <Group
+      className={`game-player-identity${isActive && showTurnIndicator ? " game-player-identity--active" : ""}`}
+      gap="sm"
+      wrap="nowrap"
+      aria-label={`${displayName}, ${side}${isActive ? ", to move" : ""}`}
+    >
       <Avatar
         src={avatarUrl}
         alt={`${displayName} avatar`}
@@ -31,6 +40,17 @@ export function GamePlayerIdentity({
         <Text size="xs" c="dimmed" truncate>
           @{username} · {side}
         </Text>
+        {isActive && showTurnIndicator && (
+          <Text
+            size="xs"
+            fw={700}
+            className="game-player-identity-turn"
+            role="status"
+            aria-live="polite"
+          >
+            To move
+          </Text>
+        )}
       </Stack>
     </Group>
   );

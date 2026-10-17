@@ -18,6 +18,12 @@ const pieceLabels: Record<BoardPiece, string> = {
   bN: "♞",
   bP: "♟",
 };
+const castlingLabels: Record<string, string> = {
+  K: "White kingside",
+  Q: "White queenside",
+  k: "Black kingside",
+  q: "Black queenside",
+};
 
 interface PositionBoardEditorProps {
   mode: "MOVES" | "DIRECT";
@@ -67,8 +73,8 @@ export function PositionBoardEditor({
       {mode === "DIRECT" ? (
         <>
           <Text size="sm">
-            Choose a piece, then choose a square. Select a square with no piece
-            selected to clear it.
+            Select a piece and then a square to place it. Choose Erase, then a
+            square to clear it. You can also drag pieces on the board.
           </Text>
           <Group gap="xs" aria-label="Choose a piece">
             {Object.keys(pieceToFen).map((key) => {
@@ -90,8 +96,9 @@ export function PositionBoardEditor({
             size="xs"
             variant="default"
             onClick={() => onPieceSelect(null)}
+            aria-label="Erase pieces from selected squares"
           >
-            Erase pieces
+            Erase
           </Button>
           <Select
             label="Side to move"
@@ -110,7 +117,7 @@ export function PositionBoardEditor({
             {["K", "Q", "k", "q"].map((right) => (
               <Checkbox
                 key={right}
-                label={right}
+                label={castlingLabels[right]}
                 checked={castling.includes(right)}
                 onChange={(event) =>
                   updateCastling(right, event.currentTarget.checked)

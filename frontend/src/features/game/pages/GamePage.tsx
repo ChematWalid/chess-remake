@@ -34,6 +34,8 @@ interface EngineEvent {
   setup_moves?: string[];
   setup_fens?: string[];
   side_to_move?: "white" | "black";
+  time_control?:
+    "unlimited" | { initial_seconds: number; increment_seconds: number };
   white_time_ms?: number;
   black_time_ms?: number;
   result?: string;
@@ -153,6 +155,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
   const optimisticMoveRef = useRef<OptimisticMove | null>(null);
   const optimisticMoveTimeout = useRef<number | undefined>(undefined);
   const livePreferences = useRef({ color, premoves });
+  const lastLiveTurn = useRef<"white" | "black" | null>(null);
   livePreferences.current = { color, premoves };
   const detail = useQuery<ChallengeDetail | GameDetail>({
     queryKey: live ? ["challenge-detail", challengeId] : ["game", id],
@@ -277,13 +280,30 @@ export function GamePage({ live = false }: { live?: boolean }) {
             setFen(event.fen);
             setMoveText([...(event.setup_moves ?? []), ...(event.moves ?? [])]);
             setClock({
-              white: event.white_time_ms ?? 0,
-              black: event.black_time_ms ?? 0,
+              white:
+                event.white_time_ms ??
+                (event.time_control === "unlimited"
+                  ? -1
+                  : (event.time_control?.initial_seconds ?? 0) * 1000),
+              black:
+                event.black_time_ms ??
+                (event.time_control === "unlimited"
+                  ? -1
+                  : (event.time_control?.initial_seconds ?? 0) * 1000),
             });
+            lastLiveTurn.current =
+              new Chess(event.fen).turn() === "w" ? "white" : "black";
             if ("playerColor" in detail.data) {
               const assignedColor = detail.data.playerColor;
-              if (assignedColor === "WHITE" || assignedColor === "BLACK")
+              if (assignedColor === "WHITE" || assignedColor === "BLACK") {
+                const normalizedColor = assignedColor.toLowerCase() as
+                  "white" | "black";
                 setColor(assignedColor.toLowerCase() as "white" | "black");
+                livePreferences.current = {
+                  ...livePreferences.current,
+                  color: normalizedColor,
+                };
+              }
             }
           } else if (event.event === "move_made" && event.fen) {
             const unconfirmedMove = optimisticMoveRef.current;
@@ -303,33 +323,32 @@ export function GamePage({ live = false }: { live?: boolean }) {
             setFen(event.fen);
             setDrawOfferedBy(null);
             setDrawOfferSent(false);
-            setClock({
-              white: event.white_time_ms ?? 0,
-              black: event.black_time_ms ?? 0,
-            });
+            setClock((current) =>
+              current
+                ? {
+                    white: event.white_time_ms ?? current.white,
+                    black: event.black_time_ms ?? current.black,
+                  }
+                : null,
+            );
+            const nextTurn =
+              event.side_to_move ??
+              (new Chess(event.fen).turn() === "w" ? "white" : "black");
+            if (
+              lastLiveTurn.current !== null &&
+              lastLiveTurn.current !== nextTurn &&
+              nextTurn === livePreferences.current.color &&
+              settingsRef.current.turnSoundEnabled
+            ) {
+              playUiTone(790);
+            }
+            lastLiveTurn.current = nextTurn;
             if (event.san) {
               setMoveText((moves) => [...moves, event.san as string]);
               if (settingsRef.current.gameSoundsEnabled)
                 playUiTone(event.san.includes("x") ? 520 : 660);
             }
             setSelected(null);
-            const queuedPremoves = livePreferences.current.premoves;
-            const queued = queuedPremoves[0];
-            if (
-              queued &&
-              event.side_to_move === livePreferences.current.color
-            ) {
-              updatePremoves(queuedPremoves.slice(1));
-              if (!sendEngineMove(queued, event.fen)) {
-                updatePremoves([]);
-                notifications.show({
-                  title: "Premove cancelled",
-                  message:
-                    "That move is no longer legal. The remaining premoves were cancelled.",
-                  color: "yellow",
-                });
-              }
-            }
           } else if (event.event === "game_over") {
             clearOptimisticMove();
             setDrawOfferedBy(null);
@@ -711,6 +730,36 @@ export function GamePage({ live = false }: { live?: boolean }) {
       });
   }
 
+  useEffect(() => {
+    if (
+      !live ||
+      !connected ||
+      premoves.length === 0 ||
+      turn !== (color === "white" ? "w" : "b") ||
+      optimisticMoveRef.current
+    )
+      return;
+
+    const queued = premoves[0];
+    if (!queued) return;
+    const position = new Chess(currentFen);
+    const isLegal = position
+      .moves({ square: queued.from, verbose: true })
+      .some((move) => move.to === queued.to);
+    if (!isLegal) {
+      updatePremoves([]);
+      notifications.show({
+        title: "Premove cancelled",
+        message:
+          "That move is no longer legal. The remaining premoves were cancelled.",
+        color: "yellow",
+      });
+      return;
+    }
+    if (sendEngineMove(queued, currentFen))
+      updatePremoves(livePreferences.current.premoves.slice(1));
+  }, [live, connected, premoves, turn, color, currentFen, optimisticMove]);
+
   function onSquareClick(square: string) {
     if (optimisticMoveRef.current) return;
     const target = square as Square;
@@ -830,7 +879,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
       <div className="game-layout">
         <section className="board-column">
           <div className="opponent-strip">
-            <GamePlayerIdentity {...topPlayer} />
+            <GamePlayerIdentity
+              {...topPlayer}
+              isActive={live && prefs.turnIndicatorEnabled && turn === "b"}
+              showTurnIndicator={live && prefs.turnIndicatorEnabled}
+            />
             {clock && (
               <Text className="clock">
                 {formatClock(clock[color === "white" ? "black" : "white"])}
@@ -844,7 +897,11 @@ export function GamePage({ live = false }: { live?: boolean }) {
           />
           {live && (
             <div className="opponent-strip">
-              <GamePlayerIdentity {...bottomPlayer} />
+              <GamePlayerIdentity
+                {...bottomPlayer}
+                isActive={live && prefs.turnIndicatorEnabled && turn === "w"}
+                showTurnIndicator={live && prefs.turnIndicatorEnabled}
+              />
               {clock && (
                 <Text className="clock">{formatClock(clock[color])}</Text>
               )}
@@ -979,6 +1036,7 @@ export function GamePage({ live = false }: { live?: boolean }) {
 }
 
 function formatClock(milliseconds: number): string {
+  if (milliseconds < 0) return "∞";
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
 }

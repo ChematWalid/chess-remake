@@ -52,6 +52,10 @@ public class UserSettings {
     private boolean moveConfirmation;
     @Column(name = "game_sounds_enabled", nullable = false)
     private boolean gameSoundsEnabled;
+    @Column(name = "turn_indicator_enabled", nullable = false)
+    private boolean turnIndicatorEnabled = true;
+    @Column(name = "turn_sound_enabled", nullable = false)
+    private boolean turnSoundEnabled;
     @Column(name = "in_app_notifications_enabled", nullable = false)
     private boolean inAppNotificationsEnabled = true;
     @Column(name = "notification_sounds_enabled", nullable = false)
@@ -69,12 +73,15 @@ public class UserSettings {
     public boolean isPremovesEnabled() { return premovesEnabled; }
     public boolean isMoveConfirmation() { return moveConfirmation; }
     public boolean isGameSoundsEnabled() { return gameSoundsEnabled; }
+    public boolean isTurnIndicatorEnabled() { return turnIndicatorEnabled; }
+    public boolean isTurnSoundEnabled() { return turnSoundEnabled; }
     public boolean isInAppNotificationsEnabled() { return inAppNotificationsEnabled; }
     public boolean isNotificationSoundsEnabled() { return notificationSoundsEnabled; }
 
     public void update(BoardPalette palette, BoardOrientation orientation, MotionPreference motion, ThemePreference theme,
                        boolean coordinates, boolean legalMoveHints, boolean premoves, boolean confirmMoves,
-                       boolean gameSounds, boolean inAppNotifications, boolean notificationSounds) {
+                       boolean gameSounds, boolean turnIndicator, boolean turnSound,
+                       boolean inAppNotifications, boolean notificationSounds) {
         boardPalette = palette;
         boardOrientation = orientation;
         motionPreference = motion;
@@ -84,6 +91,8 @@ public class UserSettings {
         premovesEnabled = premoves;
         moveConfirmation = confirmMoves;
         gameSoundsEnabled = gameSounds;
+        turnIndicatorEnabled = turnIndicator;
+        turnSoundEnabled = turnSound;
         inAppNotificationsEnabled = inAppNotifications;
         notificationSoundsEnabled = notificationSounds;
     }

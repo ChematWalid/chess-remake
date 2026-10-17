@@ -66,7 +66,12 @@ export const searchResultSchema = z.object({
 });
 export type SearchResult = z.infer<typeof searchResultSchema>;
 
-export const presenceStatusSchema = z.enum(["ONLINE", "IN_GAME", "OFFLINE", "UNKNOWN"]);
+export const presenceStatusSchema = z.enum([
+  "ONLINE",
+  "IN_GAME",
+  "OFFLINE",
+  "UNKNOWN",
+]);
 export type PresenceStatus = z.infer<typeof presenceStatusSchema>;
 export const presenceEventSchema = z.object({
   publicUserId: z.string().uuid(),
@@ -153,6 +158,8 @@ export const userSettingsSchema = z.object({
   premovesEnabled: z.boolean(),
   moveConfirmation: z.boolean(),
   gameSoundsEnabled: z.boolean(),
+  turnIndicatorEnabled: z.boolean(),
+  turnSoundEnabled: z.boolean(),
   inAppNotificationsEnabled: z.boolean(),
   notificationSoundsEnabled: z.boolean(),
 });
@@ -245,6 +252,8 @@ export const defaultSettings: UserSettings = {
   premovesEnabled: true,
   moveConfirmation: false,
   gameSoundsEnabled: false,
+  turnIndicatorEnabled: true,
+  turnSoundEnabled: false,
   inAppNotificationsEnabled: true,
   notificationSoundsEnabled: false,
 };
