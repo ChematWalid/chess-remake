@@ -77,6 +77,46 @@ TEST(JwtTokenTest, RejectExpiredToken) {
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(JwtTokenTest, RejectsOversizedSignedToken) {
+    const std::string secret = "test-secret-key-42";
+    net::PlayerToken claims;
+    claims.roomCode = "ABC999";
+    claims.userId = "user-123";
+    claims.displayName = std::string(64 * 1024, 'A');
+    claims.color = "white";
+    claims.exp = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count() + 3600;
+
+    const std::string token = net::JwtToken::create(claims, secret);
+    ASSERT_GT(token.size(), 64 * 1024);
+    EXPECT_FALSE(net::JwtToken::verify(token, secret).has_value());
+}
+
+TEST(JwtTokenTest, RejectsTokensWithEmptyRequiredClaims) {
+    const std::string secret = "test-secret-key-42";
+    net::PlayerToken claims;
+    claims.roomCode = "ABC999";
+    claims.userId = "user-123";
+    claims.displayName = "Alice";
+    claims.color = "white";
+    claims.exp = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count() + 3600;
+
+    auto missingRoom = claims;
+    missingRoom.roomCode.clear();
+    EXPECT_FALSE(net::JwtToken::verify(net::JwtToken::create(missingRoom, secret), secret).has_value());
+
+    auto missingPlayer = claims;
+    missingPlayer.userId.clear();
+    EXPECT_FALSE(net::JwtToken::verify(net::JwtToken::create(missingPlayer, secret), secret).has_value());
+
+    auto missingDisplayName = claims;
+    missingDisplayName.displayName.clear();
+    EXPECT_FALSE(net::JwtToken::verify(net::JwtToken::create(missingDisplayName, secret), secret).has_value());
+}
+
 TEST(JwtTokenTest, PreservesValidatedCustomStartingPositionAndReplay) {
     const std::string secret = "test-secret-key-42";
     const auto start = chess::Fen::standard();
