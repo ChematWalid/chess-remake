@@ -1,13 +1,8 @@
 import asyncio
-import base64
-import hashlib
-import hmac
 import json
 import os
-import time
 import urllib.request
 import uuid
-from pathlib import Path
 
 import websockets
 
@@ -31,6 +26,12 @@ def post_json(path, payload, token=None):
         return json.loads(response.read())
 
 
+def get_json(path, token):
+    request = urllib.request.Request(BASE_URL + path, headers={"Authorization": "Bearer " + token})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
+
 def login(username):
     response = post_json("/api/auth/login", {"identifier": username, "password": PASSWORD})
     return response["data"]["accessToken"]
@@ -40,16 +41,6 @@ def stomp_frame(command, headers=None, body=""):
     lines = [command]
     lines.extend(f"{key}:{value}" for key, value in (headers or {}).items())
     return "\n".join(lines) + "\n\n" + body + "\0"
-
-
-def token_matches_engine_secret(token):
-    values = dict(line.split("=", 1) for line in Path("server/.env").read_text().splitlines() if "=" in line)
-    secret = values["CHESS_JWT_SECRET"].encode()
-    header, payload, signature = token.split(".")
-    signed = f"{header}.{payload}".encode()
-    expected = base64.urlsafe_b64encode(hmac.new(secret, signed, hashlib.sha256).digest()).decode().rstrip("=")
-    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-    return hmac.compare_digest(expected, signature), claims
 
 
 async def sockjs_connect(token):
@@ -121,6 +112,7 @@ async def wait_for_error(socket, error_code, timeout=10):
 async def run():
     white_token = login(WHITE_USERNAME)
     black_token = login(BLACK_USERNAME)
+    history_before = get_json("/api/games/my-history?page=0&size=50", white_token)["data"]["totalElements"]
     white = await sockjs_connect(white_token)
     black = await sockjs_connect(black_token)
     try:
@@ -163,12 +155,15 @@ async def run():
         white_match = await wait_for_event_type(white, "MATCH_ASSIGNED")
         black_match = await wait_for_event_type(black, "MATCH_ASSIGNED")
         for match in (white_match, black_match):
-            valid_signature, claims = token_matches_engine_secret(match["token"])
-            print(f"Engine token signature={valid_signature}, room_match={claims.get('room_code') == match.get('roomCode')}, expires_in={claims.get('exp', 0) - int(time.time())}s")
-        print(f"STOMP challenge {challenge_id}: assigned room and per-player tokens")
+            assert "token" not in match or match["token"] is None, "Room tokens must not be broadcast over STOMP"
+        white_detail = get_json(f"/api/challenges/{challenge_id}", white_token)["data"]
+        black_detail = get_json(f"/api/challenges/{challenge_id}", black_token)["data"]
+        assert white_detail["roomCode"] == black_detail["roomCode"] == white_match["roomCode"]
+        assert white_detail["token"] and black_detail["token"]
+        print(f"STOMP challenge {challenge_id}: public assignment delivered; private room tokens fetched over authenticated REST")
 
-        white_socket = await websockets.connect(white_match["connectUrl"], open_timeout=10)
-        black_socket = await websockets.connect(black_match["connectUrl"], open_timeout=10)
+        white_socket = await websockets.connect(white_detail["connectUrl"], open_timeout=10)
+        black_socket = await websockets.connect(black_detail["connectUrl"], open_timeout=10)
         try:
             async def wait_cpp(socket, event_name, timeout=10):
                 async with asyncio.timeout(timeout):
@@ -186,6 +181,13 @@ async def run():
                         if message.get("event") == "error":
                             return message
 
+            await white_socket.send(json.dumps({
+                "action": "connect_token", "room_code": white_detail["roomCode"], "token": white_detail["token"],
+            }))
+            await wait_cpp(white_socket, "room_created")
+            await black_socket.send(json.dumps({
+                "action": "connect_token", "room_code": black_detail["roomCode"], "token": black_detail["token"],
+            }))
             await wait_cpp(white_socket, "game_started")
             await wait_cpp(black_socket, "game_started")
             if GAME_MODE == "checkmate":
@@ -223,9 +225,30 @@ async def run():
             await white_socket.close()
             await black_socket.close()
 
-        for query, expected in (("", "Missing room and token"), ("?room=invalid&token=invalid", "Invalid or expired token")):
-            socket = await websockets.connect(ENGINE_URL + "/ws/play" + query, open_timeout=10)
+        deadline = asyncio.get_running_loop().time() + 30
+        saved_game = None
+        while asyncio.get_running_loop().time() < deadline:
+            history = get_json("/api/games/my-history?page=0&size=50", white_token)["data"]
+            saved_game = next((game for game in history["items"]
+                               if game["whiteUsername"] == WHITE_USERNAME
+                               and game["blackUsername"] == BLACK_USERNAME
+                               and game["terminationReason"] == expected_reason), None)
+            if history["totalElements"] <= history_before:
+                saved_game = None
+            if saved_game is not None:
+                break
+            await asyncio.sleep(0.5)
+        assert saved_game is not None, "Completed game was not persisted to history"
+        details = get_json(f"/api/games/{saved_game['id']}", white_token)["data"]
+        assert len(details["fens"]) == len(details["moves"]) + 1, details
+        assert details["pgn"], details
+        print(f"Game history persisted: game {saved_game['id']} has replay FENs, moves, and PGN")
+
+        for credentials, expected in (({"action": "move", "san": "e4"}, "Not currently in a game room"),
+                                      ({"action": "connect_token", "room_code": "invalid", "token": "invalid"}, "Invalid or expired token")):
+            socket = await websockets.connect(ENGINE_URL + "/ws/play", open_timeout=10)
             try:
+                await socket.send(json.dumps(credentials))
                 result = json.loads(await asyncio.wait_for(socket.recv(), timeout=5))
                 assert result.get("event") == "error" and expected in result.get("message", ""), result
             finally:

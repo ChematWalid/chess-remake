@@ -50,6 +50,10 @@ public:
         messages_.clear();
     }
 
+    [[nodiscard]] bool isClosed() const {
+        return closed_;
+    }
+
 private:
     std::string id_;
     mutable std::mutex mutex_;
@@ -230,27 +234,26 @@ TEST(RoomManagerTest, MultiRoomIsolation) {
 }
 
 /**
- * Regression test for Item 4: Sub-minute time control parsing and invalid time control error rejection.
+ * Legacy unauthenticated room actions are rejected and close their sessions.
  */
-TEST(RoomManagerTest, TimeControlParsingAndValidation) {
+TEST(RoomManagerTest, RejectsLegacyRoomActions) {
     net::RoomManager manager;
     auto alice = std::make_shared<MockSession>("alice-tc");
 
     manager.routeMessage(alice, R"({"action":"create_room","time_control":{"seconds":30}})");
-    auto room = manager.getRoomBySession("alice-tc");
-    ASSERT_TRUE(room != nullptr);
-    EXPECT_FALSE(room->getTimeControl().isUnlimited);
-    EXPECT_EQ(room->getTimeControl().initialTime.count(), 30000);
+    EXPECT_EQ(alice->lastJson()["event"], "error");
+    EXPECT_TRUE(alice->isClosed());
+    EXPECT_EQ(manager.activeRoomCount(), 0u);
 
     auto bob = std::make_shared<MockSession>("bob-tc");
     manager.routeMessage(bob, R"({"action":"create_room","time_control":{"minutes":-5}})");
     EXPECT_EQ(bob->lastJson()["event"], "error");
-    EXPECT_TRUE(manager.getRoomBySession("bob-tc") == nullptr);
+    EXPECT_TRUE(bob->isClosed());
 
     auto charlie = std::make_shared<MockSession>("charlie-tc");
     manager.routeMessage(charlie, R"({"action":"create_room","time_control":"lightning"})");
     EXPECT_EQ(charlie->lastJson()["event"], "error");
-    EXPECT_TRUE(manager.getRoomBySession("charlie-tc") == nullptr);
+    EXPECT_TRUE(charlie->isClosed());
 }
 
 /**

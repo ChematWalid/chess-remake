@@ -24,7 +24,9 @@ Black receives an `INVITATION_RECEIVED` event at `/user/queue/challenges`; White
 {"challengeId":<challengeId>}
 ```
 
-Both users receive `MATCH_ASSIGNED` with `roomCode`, `color`, `connectUrl`, and `token`. Verify `/api/challenges/{challengeId}` returns the same room assignment to either participant. Start the game using the two C++ WebSocket URLs supplied by this event.
+Both users receive `MATCH_ASSIGNED` with `roomCode`, `color`, and `connectUrl`. The STOMP event does not include a room token. Each player calls `GET /api/challenges/{challengeId}` with their own access token to receive a short-lived, player-specific room token. Connect to the returned `connectUrl`, then send `{"action":"connect_token","room_code":"<roomCode>","token":"<roomToken>"}` as the first WebSocket frame. Credentials stay out of URL query strings and STOMP broadcasts.
+
+If both players have not connected and started the game within `APP_GAME_START_TIMEOUT` (default two minutes), Spring expires the accepted challenge, clears both players' in-game presence, and sends a `STATUS_CHANGED` event. On both player connections, the C++ server must confirm the exact room and assigned player IDs through `POST /api/internal/games/start` before it starts clocks or accepts moves.
 
 ### Challenge lifecycle and error probes
 
@@ -39,7 +41,7 @@ Both users receive `MATCH_ASSIGNED` with `roomCode`, `color`, `connectUrl`, and 
 
 ## C++ game WebSocket
 
-Connect to each `connectUrl` returned by Spring (do not construct or persist room tokens in a frontend). It has the form `ws://localhost:9002/ws/play?room=<roomCode>&token=<roomToken>`.
+Connect to each `connectUrl` returned by Spring (do not construct or persist room tokens in a frontend). It is `ws://localhost:9002/ws/play` with no credentials in the URL. Send each player's room token in the initial `connect_token` frame.
 
 ### Completed game and replay persistence
 
@@ -58,7 +60,7 @@ Also play separate games ending by resignation, agreed draw (offer/accept), stal
 
 ### C++ WebSocket error probes
 
-- Connect with no room/token, an invalid signature, an expired token, a token for another room, or an invalid room code.
+- Send gameplay before authenticating, omit credentials from `connect_token`, use an invalid or expired token, or send a token for another room. These connections must receive an error and close.
 - Send invalid JSON, unknown action, missing move, invalid SAN/UCI, out-of-turn move, illegal move, malformed join, and duplicate join.
 - Attempt to act as the wrong color, offer a draw twice, answer without a pending draw, and send move/resign after game over.
 - Disconnect a player mid-game and reconnect using the same valid identity. Observe disconnect/reconnect notifications and ensure there is no false game record.

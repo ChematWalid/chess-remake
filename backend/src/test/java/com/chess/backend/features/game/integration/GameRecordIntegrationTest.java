@@ -163,8 +163,8 @@ class GameRecordIntegrationTest {
     void engineMustConfirmBothPlayersBeforeARecordCanBeSaved() throws Exception {
         GameChallenge challenge = acceptedChallenge("ROOM07");
         challenge.setStatus(ChallengeStatus.ACCEPTED);
+        challenge.markStarted(null);
         GameChallenge unstated = challenges.save(challenge);
-        unstated.markStarted(null);
 
         mockMvc.perform(post("/api/internal/games/record")
                         .header("X-Internal-Token", INTERNAL_TOKEN)

@@ -111,7 +111,7 @@ std::optional<PlayerToken> JwtToken::verify(
     try {
         const auto header = nlohmann::json::parse(headerJson);
         if (!header.is_object() || header.value("alg", std::string{}) != "HS256"
-                || header.value("typ", std::string{}) != "JWT") {
+                || (header.contains("typ") && header.value("typ", std::string{}) != "JWT")) {
             return std::nullopt;
         }
     } catch (...) {

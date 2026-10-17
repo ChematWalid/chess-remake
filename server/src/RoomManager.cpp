@@ -210,6 +210,7 @@ void RoomManager::routeMessage(
     std::shared_ptr<GameRoom> room = getRoomBySession(session->getId());
     if (!room) {
         session->send(Protocol::error("Not currently in a game room"));
+        session->close();
         return;
     }
 

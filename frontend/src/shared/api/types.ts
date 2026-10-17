@@ -195,7 +195,7 @@ export const challengeEventSchema = z.object({
   roomCode: z.string().optional(),
   color: z.enum(["WHITE", "BLACK"]).optional(),
   connectUrl: z.string().optional(),
-  token: z.string().optional(),
+  token: z.string().nullable().optional(),
   initialTimeSeconds: z.number().int().nullable().optional(),
   incrementSeconds: z.number().int().nullable().optional(),
   message: z.string().optional(),
