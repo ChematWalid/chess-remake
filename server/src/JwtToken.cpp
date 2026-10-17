@@ -12,6 +12,8 @@ namespace net {
 
 namespace {
 
+constexpr size_t kMaxJwtSizeBytes = 64 * 1024;
+
 const std::string kB64Chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
@@ -100,6 +102,10 @@ std::optional<PlayerToken> JwtToken::verify(
     const std::string& token,
     const std::string& secret
 ) {
+    if (token.size() > kMaxJwtSizeBytes) {
+        return std::nullopt;
+    }
+
     auto dot1 = token.find('.');
     if (dot1 == std::string::npos) {
         return std::nullopt;
